@@ -1,0 +1,15 @@
+# Jekyll 构建产物(GitHub Actions 会在云端重新构建，无需提交)
+_site/
+.jekyll-cache/
+
+# Ruby / Bundler
+.bundle/
+vendor/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/

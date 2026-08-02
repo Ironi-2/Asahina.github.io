@@ -1,0 +1,41 @@
+title: Asahina's Blog
+email: 2477692158@qq.com
+description: >- # this means to ignore newlines until "baseurl:"
+  新手小白分享技术心得与学习笔记。
+baseurl: "/Asahina.github.io" # 项目站点：部署在 ironi-2.github.io 的子目录下
+url: "https://ironi-2.github.io" # 站点的最终 URL
+author: Ash
+twitter_username: Ash
+github_username:  Asahina
+
+# Theme (示例，具体取决于您选择的主题)
+theme: minima # 如果使用 gem-based 主题，如 minima, chirpy 等
+
+# Build settings
+markdown: kramdown
+kramdown:
+  input: GFM # GitHub Flavored Markdown
+  syntax_highlighter: rouge
+
+# 编码设置
+encoding: utf-8
+
+# Plugins (示例)
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  # - jekyll-paginate (如果需要分页)
+
+# Exclude from processing.
+# The following items will not be processed, by default.
+# Any item listed under the `exclude:` key here will be ignored by Jekyll.
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - README.md
+  - LICENSE.md
