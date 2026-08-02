@@ -5,8 +5,8 @@ description: >- # this means to ignore newlines until "baseurl:"
 baseurl: "/Asahina.github.io" # 项目站点：部署在 ironi-2.github.io 的子目录下
 url: "https://ironi-2.github.io" # 站点的最终 URL
 author: Ash
-twitter_username: Ash
-github_username:  Asahina
+twitter_username: ash
+github_username:  Ironi-2
 
 # Theme (示例，具体取决于您选择的主题)
 theme: minima # 如果使用 gem-based 主题，如 minima, chirpy 等
