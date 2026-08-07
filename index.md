@@ -2,7 +2,6 @@
 layout: home
 ---
 
-# 欢迎访问 Asahina's Blog
 
 这里是 Ash 的个人博客，分享技术心得与学习笔记。
 
