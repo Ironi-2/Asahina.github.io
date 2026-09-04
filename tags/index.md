@@ -1,5 +1,5 @@
 ---
 layout: tags
-title: 标签云
+title: 标签分类
 permalink: /tags/
 ---
