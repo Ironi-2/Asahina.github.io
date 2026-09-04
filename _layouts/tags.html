@@ -1,0 +1,71 @@
+---
+layout: default
+---
+
+<!-- Tags Archive Section -->
+<section class="tags-section" aria-labelledby="tags-heading">
+  <div class="wrapper">
+    <header class="section-header">
+      <h1 id="tags-heading" class="section-title">{{ page.title }}</h1>
+      <p class="section-subtitle">按标签浏览文章</p>
+    </header>
+
+    {% assign tags = site.tags | sort %}
+    {% if tags.size > 0 %}
+    <div class="tags-cloud">
+      {% for tag in tags %}
+      {% assign tag_name = tag[0] %}
+      {% assign tag_posts = tag[1] %}
+      <a href="#tag-{{ tag_name | slugify }}" class="tag-link" data-count="{{ tag_posts.size }}">
+        <span class="tag-name">{{ tag_name }}</span>
+        <span class="tag-count">{{ tag_posts.size }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="tags-content">
+      {% for tag in tags %}
+      {% assign tag_name = tag[0] %}
+      {% assign tag_posts = tag[1] %}
+      <section id="tag-{{ tag_name | slugify }}" class="tag-group">
+        <h2 class="tag-group-title">{{ tag_name }} <span class="tag-group-count">({{ tag_posts.size }})</span></h2>
+        <div class="posts-grid">
+          {% for post in tag_posts %}
+          <article class="post-card" itemscope itemtype="http://schema.org/BlogPosting">
+            <div class="post-card-image">
+              {% if post.cover %}
+              <img src="{{ post.cover | relative_url }}" alt="" loading="lazy">
+              {% else %}
+              <div class="post-card-placeholder" style="background: {{ post.color | default: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}"></div>
+              {% endif %}
+            </div>
+            <div class="post-card-content">
+              <time class="post-card-date" datetime="{{ post.date | date_to_xmlschema }}" itemprop="datePublished">
+                {{ post.date | date: "%Y年%m月%d日" }}
+              </time>
+              <h3 class="post-card-title" itemprop="headline">
+                <a href="{{ post.url | relative_url }}" itemprop="url">{{ post.title }}</a>
+              </h3>
+              {% if post.excerpt %}
+              <p class="post-card-excerpt" itemprop="description">{{ post.excerpt | strip_html | truncate: 120 }}</p>
+              {% endif %}
+              <a href="{{ post.url | relative_url }}" class="post-card-link" aria-label="阅读全文：{{ post.title }}">
+                阅读全文
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      <h3>暂无标签</h3>
+      <p>文章添加标签后将自动显示</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
