@@ -8,14 +8,14 @@ author: Ash
 twitter_username: ash
 github_username:  Ironi-2
 
-# Theme (示例，具体取决于您选择的主题)
-theme: minima # 如果使用 gem-based 主题，如 minima, chirpy 等
-
 # Build settings
 markdown: kramdown
 kramdown:
   input: GFM # GitHub Flavored Markdown
   syntax_highlighter: rouge
+
+# Cache directory (避免中文路径问题)
+cache_dir: "C:/Temp/jekyll-cache"
 
 # 编码设置
 encoding: utf-8

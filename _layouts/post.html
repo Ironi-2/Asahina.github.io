@@ -1,0 +1,96 @@
+﻿---
+layout: default
+---
+
+<article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post-header">
+    <div class="post-meta">
+      <time class="post-date" datetime="{{ page.date | date_to_xmlschema }}" itemprop="datePublished">
+        {{ page.date | date: "%Y年%m月%d日" }}
+      </time>
+      {% if page.tags.size > 0 %}
+      <div class="post-tags">
+        {% for tag in page.tags %}
+        <a href="{{ '/tags/' | relative_url }}#{{ tag | slugify }}" class="tag" rel="tag">{{ tag }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <h1 class="post-title" itemprop="headline">{{ page.title }}</h1>
+    {% if page.excerpt %}
+    <p class="post-excerpt" itemprop="description">{{ page.excerpt }}</p>
+    {% endif %}
+    {% if page.cover %}
+    <div class="post-cover">
+      <img src="{{ page.cover | relative_url }}" alt="{{ page.title }}" itemprop="image">
+    </div>
+    {% endif %}
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    {{ content }}
+  </div>
+
+  <footer class="post-footer">
+    {% if page.author %}
+    <div class="post-author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <div class="author-avatar">
+        {% if page.author.avatar %}
+        <img src="{{ page.author.avatar | relative_url }}" alt="{{ page.author.name }}">
+        {% else %}
+        <div class="avatar-placeholder">{{ page.author.name | slice: 0, 1 | upcase }}</div>
+        {% endif %}
+      </div>
+      <div class="author-info">
+        <span class="author-name" itemprop="name">{{ page.author.name }}</span>
+        {% if page.author.bio %}
+        <p class="author-bio">{{ page.author.bio }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="post-navigation">
+      {% if page.previous %}
+      <a href="{{ page.previous.url | relative_url }}" class="nav-link prev" rel="prev">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        <span>
+          <small>上一篇</small>
+          {{ page.previous.title | truncate: 40 }}
+        </span>
+      </a>
+      {% endif %}
+      {% if page.next %}
+      <a href="{{ page.next.url | relative_url }}" class="nav-link next" rel="next">
+        <span>
+          <small>下一篇</small>
+          {{ page.next.title | truncate: 40 }}
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+      {% endif %}
+    </div>
+
+    {% if site.disqus.shortname %}
+    <div class="post-comments">
+      {% include disqus_comments.html %}
+    </div>
+    {% endif %}
+  </footer>
+</article>
+
+{% if page.related_posts %}
+<aside class="related-posts" aria-labelledby="related-heading">
+  <h2 id="related-heading" class="section-title">相关阅读</h2>
+  <div class="posts-grid">
+    {% for post in page.related_posts limit: 3 %}
+    <article class="post-card">
+      <div class="post-card-content">
+        <time class="post-card-date" datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%Y年%m月%d日" }}</time>
+        <h3 class="post-card-title"><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</aside>
+{% endif %}

@@ -1,0 +1,33 @@
+﻿<header class="site-header" role="banner">
+  <div class="wrapper header-inner">
+    <a class="site-title" href="{{ '/' | relative_url }}" rel="home" aria-label="{{ site.title }} - 首页">
+      <span class="site-title-text">{{ site.title }}</span>
+    </a>
+
+    <nav class="site-nav" role="navigation" aria-label="主导航">
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="切换菜单">
+        <span class="hamburger" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </button>
+
+      <ul id="nav-menu" class="nav-menu">
+        <li><a href="{{ '/' | relative_url }}" class="nav-link {% if page.url == '/' %}active{% endif %}">首页</a></li>
+        <li><a href="{{ '/posts/' | relative_url }}" class="nav-link {% if page.url contains '/posts/' %}active{% endif %}">文章</a></li>
+        {% if site.tags.size > 0 %}
+        <li><a href="{{ '/tags/' | relative_url }}" class="nav-link {% if page.url contains '/tags/' %}active{% endif %}">标签</a></li>
+        {% endif %}
+        <li><a href="{{ '/about/' | relative_url }}" class="nav-link {% if page.url contains '/about/' %}active{% endif %}">关于</a></li>
+      </ul>
+    </nav>
+
+    <div class="header-actions">
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题" aria-pressed="false">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
