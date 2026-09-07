@@ -6,13 +6,16 @@ baseurl: "/Asahina.github.io" # 项目站点：部署在 ironi-2.github.io 的�
 url: "https://ironi-2.github.io" # 站点的最终 URL
 author: Ash
 twitter_username: ash
-github_username:  Ironi-2
+github_username: Ironi-2
 
 # Build settings
 markdown: kramdown
 kramdown:
-  input: GFM # GitHub Flavored Markdown
+  input: GFM
   syntax_highlighter: rouge
+  math_engine: katex
+  math_engine_opts:
+    display_mode: true
 
 # Cache directory (避免中文路径问题)
 cache_dir: "C:/Temp/jekyll-cache"
@@ -20,15 +23,13 @@ cache_dir: "C:/Temp/jekyll-cache"
 # 编码设置
 encoding: utf-8
 
-# Plugins (示例)
+# Plugins
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
   # - jekyll-paginate (如果需要分页)
 
-# Exclude from processing.
-# The following items will not be processed, by default.
-# Any item listed under the `exclude:` key here will be ignored by Jekyll.
+# Exclude from processing
 exclude:
   - Gemfile
   - Gemfile.lock
