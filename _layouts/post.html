@@ -31,6 +31,12 @@ layout: default
     {{ content }}
   </div>
 
+  {% if page.comments != false %}
+    <section class="post-comments" style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--color-border);">
+      {% include giscus.html %}
+    </section>
+  {% endif %}
+
   <footer class="post-footer">
     {% if page.author %}
     <div class="post-author" itemprop="author" itemscope itemtype="http://schema.org/Person">
