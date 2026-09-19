@@ -40,3 +40,12 @@ exclude:
   - vendor/ruby/
   - README.md
   - LICENSE.md
+
+  # 默认作者配置（新增）
+default_author:
+  name: "Ash"
+  bio: "喜欢折腾技术，记录学习与求职路上的点滴。"
+  avatar: "/Asahina.github.io/assets/images/avatar.png"
+  github: "Ironi-2"
+  email: "1811369773@qq.com"
+  twitter: "ash"
