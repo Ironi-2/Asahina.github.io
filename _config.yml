@@ -43,7 +43,7 @@ exclude:
 
   # 默认作者配置（新增）
 default_author:
-  name: "Ash"
+  name: "Zhen"
   bio: "喜欢折腾技术，记录学习与求职路上的点滴。"
   avatar: "/Asahina.github.io/assets/images/avatar.png"
   github: "Ironi-2"
