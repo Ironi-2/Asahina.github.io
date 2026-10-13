@@ -1,4 +1,4 @@
-﻿---
+---
 layout: default
 title: "知识图谱"
 permalink: /graph/

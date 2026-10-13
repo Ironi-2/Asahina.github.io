@@ -1,4 +1,4 @@
-﻿---
+---
 layout: default
 ---
 
@@ -18,7 +18,7 @@ layout: default
     </div>
     <h1 class="post-title" itemprop="headline">{{ page.title }}</h1>
     {% if page.excerpt %}
-    <p class="post-excerpt" itemprop="description">{{ page.excerpt }}</p>
+    <p class="post-excerpt" itemprop="description">{{ page.excerpt | strip_html }}</p>
     {% endif %}
     {% if page.cover %}
     <div class="post-cover">
@@ -120,12 +120,6 @@ layout: default
       </a>
       {% endif %}
     </div>
-
-    {% if site.disqus.shortname %}
-    <div class="post-comments">
-      {% include disqus_comments.html %}
-    </div>
-    {% endif %}
   </footer>
 </article>
 

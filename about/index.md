@@ -4,7 +4,7 @@ title: 关于我
 permalink: /about/
 ---
 
-这里是关于我的介绍内容...
+这里是关于我的简介..
 
 ## 联系方式
 
@@ -19,7 +19,7 @@ permalink: /about/
   </a>
   <a href="tencent://message/?uin=2499986486" class="contact-item">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.5 14.5h-3v-3h3v-1.5h-4.5v-3h-1.5v3H9.5v1.5h3V18h4.5v-1.5zm0-6h-3V7.5h3V6h-4.5v1.5h3v3H9.5V7.5h3V6H9.5v1.5h3v3H9.5v1.5h4.5v-1.5z"/></svg>
-    <span>小弟QQ（不是我）: 2499986486</span>
+    <span>小猪QQ（不是我） 2499986486</span>
   </a>
 </div>
 

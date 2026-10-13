@@ -1,4 +1,4 @@
-﻿// Knowledge Graph Visualization - D3.js Force Directed Graph
+// Knowledge Graph Visualization - D3.js Force Directed Graph
 // Obsidian-style graph view for Jekyll blog
 
 (function() {

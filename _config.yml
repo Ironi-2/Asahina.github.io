@@ -1,6 +1,6 @@
-﻿title: Asahina'"'"'s Blog
+title: "Asahina's Blog"
 email: 1811369773@qq.com
-description: >- # this means to ignore newlines until "baseurl:"
+description: >-
   个人博客分享技术心得与生活感悟
 baseurl: "/Asahina.github.io"
 url: "https://ironi-2.github.io"
@@ -13,9 +13,6 @@ markdown: kramdown
 kramdown:
   input: GFM
   syntax_highlighter: rouge
-  math_engine: katex
-  math_engine_opts:
-    display_mode: true
 
 # Cache directory
 cache_dir: "C:/Temp/jekyll-cache"
@@ -39,6 +36,8 @@ exclude:
   - vendor/ruby/
   - README.md
   - LICENSE.md
+  - Temp
+  - gen_graph.rb
 
 # Graph Generator
 graph_enabled: true

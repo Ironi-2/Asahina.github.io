@@ -1,4 +1,4 @@
-﻿# frozen_string_literal: true
+# frozen_string_literal: true
 
 module Jekyll
   class GraphGenerator < Generator
@@ -17,8 +17,11 @@ module Jekyll
 
       posts.each do |post|
         post_data = post.data
-        slug = post_data["slug"] || post.basename_without_ext
-        url = post.url
+        # basename_without_ext 形如 "2026-09-07-函数证明"，剥掉日期前缀得到 slug；
+        # 正则同时兼容月/日未补零的文件名（如 2026-9-17-算子开发理解）
+        slug = post_data["slug"] || post.basename_without_ext.to_s.sub(/^\d{4}-\d{1,2}-\d{1,2}-/, "")
+        # post.url 不含 baseurl，拼上后才能从 /graph/ 页正确跳转
+        url = site.config["baseurl"].to_s + post.url
         title = post_data["title"] || slug
         tags = Array(post_data["tags"])
         categories = Array(post_data["categories"])
@@ -122,11 +125,15 @@ module Jekyll
       require "json"
       require "fileutils"
 
+      # 生成器运行于写站之前，目标目录可能尚不存在，必须先创建
+      FileUtils.mkdir_p(File.join(site.dest, "assets", "data"))
       File.write(
         File.join(site.dest, "assets", "data", "graph.json"),
         JSON.pretty_generate(graph_data)
       )
 
+      # 同时写回源目录，保证提交进仓库的 graph.json 与构建结果一致
+      # （GitHub Pages 不运行自定义插件，线上读取的是仓库里的这份文件）
       FileUtils.mkdir_p(File.join(site.source, "assets", "data"))
       File.write(
         File.join(site.source, "assets", "data", "graph.json"),
