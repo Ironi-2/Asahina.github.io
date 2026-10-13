@@ -1,6 +1,6 @@
 ﻿<header class="site-header" role="banner">
   <div class="wrapper header-inner">
-    <a class="site-title" href="{{ '/' | relative_url }}" rel="home" aria-label="{{ site.title }} - 首页">
+    <a class="site-title" href="{{ "/" | relative_url }}" rel="home" aria-label="{{ site.title }} - 首页">
       <span class="site-title-text">{{ site.title }}</span>
     </a>
 
@@ -14,12 +14,13 @@
       </button>
 
       <ul id="nav-menu" class="nav-menu">
-        <li><a href="{{ '/' | relative_url }}" class="nav-link {% if page.url == '/' %}active{% endif %}">首页</a></li>
-        <li><a href="{{ '/posts/' | relative_url }}" class="nav-link {% if page.url contains '/posts/' %}active{% endif %}">文章</a></li>
+        <li><a href="{{ "/" | relative_url }}" class="nav-link {% if page.url == "/" %}active{% endif %}">首页</a></li>
+        <li><a href="{{ "/posts/" | relative_url }}" class="nav-link {% if page.url contains "/posts/" %}active{% endif %}">文章</a></li>
+        <li><a href="{{ "/graph/" | relative_url }}" class="nav-link {% if page.url == "/graph/" %}active{% endif %}">知识图谱</a></li>
         {% if site.tags.size > 0 %}
-        <li><a href="{{ '/tags/' | relative_url }}" class="nav-link {% if page.url contains '/tags/' %}active{% endif %}">标签</a></li>
+        <li><a href="{{ "/tags/" | relative_url }}" class="nav-link {% if page.url contains "/tags/" %}active{% endif %}">标签</a></li>
         {% endif %}
-        <li><a href="{{ '/about/' | relative_url }}" class="nav-link {% if page.url contains '/about/' %}active{% endif %}">关于</a></li>
+        <li><a href="{{ "/about/" | relative_url }}" class="nav-link {% if page.url contains "/about/" %}active{% endif %}">关于</a></li>
       </ul>
     </nav>
 

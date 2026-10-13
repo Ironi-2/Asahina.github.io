@@ -1,9 +1,9 @@
-title: Asahina's Blog
+﻿title: Asahina'"'"'s Blog
 email: 1811369773@qq.com
 description: >- # this means to ignore newlines until "baseurl:"
-  新手小白分享技术心得与学习笔记。
-baseurl: "/Asahina.github.io" # 项目站点：部署在 ironi-2.github.io 的子目录下
-url: "https://ironi-2.github.io" # 站点的最终 URL
+  个人博客分享技术心得与生活感悟
+baseurl: "/Asahina.github.io"
+url: "https://ironi-2.github.io"
 author: Ash
 twitter_username: ash
 github_username: Ironi-2
@@ -17,17 +17,16 @@ kramdown:
   math_engine_opts:
     display_mode: true
 
-# Cache directory (避免中文路径问题)
+# Cache directory
 cache_dir: "C:/Temp/jekyll-cache"
 
-# 编码设置
+# Encoding
 encoding: utf-8
 
 # Plugins
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
-  # - jekyll-paginate (如果需要分页)
 
 # Exclude from processing
 exclude:
@@ -41,10 +40,13 @@ exclude:
   - README.md
   - LICENSE.md
 
-  # 默认作者配置（新增）
+# Graph Generator
+graph_enabled: true
+
+# Default author
 default_author:
   name: "Zhen"
-  bio: "喜欢折腾技术，记录学习与求职路上的点滴。"
+  bio: "热爱编程技术，记录学习与思考"
   avatar: "/assets/images/author1.png"
   github: "Ironi-2"
   email: "1811369773@qq.com"

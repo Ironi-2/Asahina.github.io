@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="{{ page.lang | default: site.lang | default: 'zh-CN' }}">
+<html lang="{{ page.lang | default: site.lang | default: "zh-CN" }}">
 
 <head>
   <meta charset="utf-8">
@@ -9,9 +9,9 @@
   <title>{% if page.title %}{{ page.title | escape }} | {% endif %}{{ site.title | escape }}</title>
   <meta name="description" content="{% if page.excerpt %}{{ page.excerpt | strip_html | strip_newlines | truncate: 160 }}{% elsif page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}">
 
-  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
-  <link rel="alternate" type="application/rss+xml" title="{{ site.title | escape }}" href="{{ '/feed.xml' | relative_url }}">
-  <link rel="icon" href="{{ '/assets/images/favicon.ico' | relative_url }}">
+  <link rel="stylesheet" href="{{ "/assets/css/style.css" | relative_url }}">
+  <link rel="alternate" type="application/rss+xml" title="{{ site.title | escape }}" href="{{ "/feed.xml" | relative_url }}">
+  <link rel="icon" href="{{ "/assets/images/favicon.ico" | relative_url }}">
 
   {% seo %}
 
@@ -24,10 +24,10 @@
     if (window.renderMathInElement) {
       renderMathInElement(document.body, {
         delimiters: [
-          {left: '$$', right: '$$', display: true},
-          {left: '$', right: '$', display: false},
-          {left: '\\(', right: '\\)', display: false},
-          {left: '\\[', right: '\\]', display: true}
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false},
+          {left: "\\(", right: "\\)", display: false},
+          {left: "\\[", right: "\\]", display: true}
         ],
         throwOnError: false,
         strict: false
@@ -36,12 +36,17 @@
       setTimeout(renderMath, 50);
     }
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderMath);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", renderMath);
   } else {
     renderMath();
   }
 </script>
+
+<!-- D3.js for Knowledge Graph (only on graph page) -->
+{% if page.url == "/graph/" or page.url == "/Asahina.github.io/graph/" %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" crossorigin="anonymous"></script>
+{% endif %}
 </head>
 
 <body>
@@ -57,7 +62,12 @@
 
   {% include footer.html %}
 
-  <script src="{{ '/assets/js/main.js' | relative_url }}"></script>
+  <script src="{{ "/assets/js/main.js" | relative_url }}"></script>
+
+  <!-- Graph JS (only on graph page) -->
+  {% if page.url == "/graph/" or page.url == "/Asahina.github.io/graph/" %}
+  <script src="{{ "/assets/js/graph.js" | relative_url }}"></script>
+  {% endif %}
 </body>
 
 </html>
