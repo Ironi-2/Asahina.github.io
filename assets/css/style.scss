@@ -826,6 +826,7 @@ hr { border: none; border-top: 1px solid var(--color-border); margin: var(--spac
 
 .node-label {
   font-family: var(--font-sans);
+  fill: var(--color-text-secondary);
   pointer-events: none;
   user-select: none;
   transition: opacity var(--transition-fast);

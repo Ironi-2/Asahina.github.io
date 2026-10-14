@@ -38,6 +38,8 @@
   let edgeFilter = 'all';
   let zoom = null;
   let selectedNode = null;
+  let currentNodes = [];
+  let currentEdges = [];
 
   // DOM Elements
   const svgEl = document.getElementById('graph-svg');
@@ -167,12 +169,12 @@
   function setupControls() {
     filterTypeEl?.addEventListener('change', (e) => {
       nodeFilter = e.target.value;
-      renderGraph();
+      restartSimulation();
     });
 
     filterConnectionEl?.addEventListener('change', (e) => {
       edgeFilter = e.target.value;
-      renderGraph();
+      restartSimulation();
     });
 
     layoutTypeEl?.addEventListener('change', (e) => {
@@ -192,6 +194,7 @@
 
   function renderGraph() {
     if (!graphData) return;
+    if (simulation) simulation.stop();
 
     const { nodes, edges } = graphData;
     const width = +svg.attr('width');
@@ -205,21 +208,19 @@
     const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
 
     // Filter edges
-    let filteredEdges = edges.filter(e =>
-      filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
-    );
+    // 注意：forceLink 会把 source/target 从 id 字符串替换为节点对象，
+    // 二次渲染时必须先取出 id 再比对，否则连线会被全部过滤掉
+    let filteredEdges = edges.filter(e => {
+      const s = e.source.id || e.source;
+      const t = e.target.id || e.target;
+      return filteredNodeIds.has(s) && filteredNodeIds.has(t);
+    });
     if (edgeFilter !== 'all') {
       filteredEdges = filteredEdges.filter(e => e.type === edgeFilter);
     }
 
-    // Build adjacency for force layout
-    const nodeMap = new Map(filteredNodes.map(n => [n.id, n]));
-    const adjacency = new Map();
-    filteredNodes.forEach(n => adjacency.set(n.id, []));
-    filteredEdges.forEach(e => {
-      if (adjacency.has(e.source)) adjacency.get(e.source).push(e.target);
-      if (adjacency.has(e.target)) adjacency.get(e.target).push(e.source);
-    });
+    currentNodes = filteredNodes;
+    currentEdges = filteredEdges;
 
     // Create simulation
     const forceConfig = CONFIG.forces[currentLayout];
@@ -248,15 +249,15 @@
     const linkEnter = link.enter()
       .append('line')
       .attr('class', 'graph-link')
+      .on('mouseenter', (event, d) => highlightEdge(event.currentTarget, d, true))
+      .on('mouseleave', (event, d) => highlightEdge(event.currentTarget, d, false));
+
+    link.merge(linkEnter)
       .attr('stroke-width', d => Math.max(1, (d.weight || 1) * 1.5))
       .attr('stroke', d => CONFIG.colors.edge[d.type] || '#999')
       .attr('stroke-dasharray', d => d.type === 'similarity' ? '4,2' : 'none')
       .attr('marker-end', d => `url(#arrow-${d.type})`)
-      .style('opacity', 0.6)
-      .on('mouseenter', (event, d) => highlightEdge(d, true))
-      .on('mouseleave', (event, d) => highlightEdge(d, false));
-
-    link.merge(linkEnter);
+      .style('opacity', 0.6);
 
     // Draw nodes
     const node = g.selectAll('.graph-node')
@@ -274,42 +275,37 @@
       .on('mouseenter', (event, d) => showTooltip(event, d))
       .on('mouseleave', hideTooltip);
 
-    // Node circle
     nodeEnter.append('circle')
-      .attr('r', getNodeRadius)
-      .attr('fill', d => `url(#grad-${d.type})`)
-      .attr('stroke', d => CONFIG.colors[d.type])
       .attr('stroke-width', 2)
       .style('filter', 'url(#glow)');
 
-    // Node label
     nodeEnter.append('text')
       .attr('class', 'node-label')
       .attr('text-anchor', 'middle')
       .attr('dy', d => getNodeRadius(d) + 14)
       .attr('font-size', '11px')
-      .attr('fill', 'var(--text-secondary)')
-      .attr('pointer-events', 'none')
+      .attr('pointer-events', 'none');
+
+    const nodeAll = node.merge(nodeEnter);
+    nodeAll.select('circle')
+      .attr('r', getNodeRadius)
+      .attr('fill', d => `url(#grad-${d.type})`)
+      .attr('stroke', d => CONFIG.colors[d.type]);
+    nodeAll.select('text')
       .text(d => d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label)
       .style('opacity', d => d.type === 'post' ? 0 : 1);
-
-    node.merge(nodeEnter);
-
-    // Store references for tick
-    g.selectAll('.graph-link')._data = filteredEdges;
-    g.selectAll('.graph-node')._data = filteredNodes;
 
     function ticked() {
       // Update edges
       g.selectAll('.graph-link')
-        .attr('x1', d => (d.source.x || d.source.x) ?? 0)
-        .attr('y1', d => (d.source.y || d.source.y) ?? 0)
-        .attr('x2', d => (d.target.x || d.target.x) ?? 0)
-        .attr('y2', d => (d.target.y || d.target.y) ?? 0);
+        .attr('x1', d => (d.source.x ?? 0))
+        .attr('y1', d => (d.source.y ?? 0))
+        .attr('x2', d => (d.target.x ?? 0))
+        .attr('y2', d => (d.target.y ?? 0));
 
       // Update nodes
       g.selectAll('.graph-node')
-        .attr('transform', d => `translate(${d.x},${d.y})`);
+        .attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     }
 
     function drag(sim) {
@@ -376,7 +372,7 @@
       .style('opacity', n => {
         if (n.id === nodeId) return 1;
         // Check if connected
-        const linked = g.selectAll('.graph-link')._data?.some(l =>
+        const linked = currentEdges.some(l =>
           ((l.source.id || l.source) === nodeId && (l.target.id || l.target) === n.id) ||
           ((l.target.id || l.target) === nodeId && (l.source.id || l.source) === n.id)
         );
@@ -384,9 +380,9 @@
       });
   }
 
-  function highlightEdge(edge, on) {
+  function highlightEdge(element, edge, on) {
     if (on) {
-      d3.select(event.currentTarget)
+      d3.select(element)
         .attr('stroke-width', 4)
         .style('opacity', 1);
       // Highlight connected nodes
@@ -395,7 +391,7 @@
       g.selectAll('.graph-node')
         .style('opacity', n => n.id === sourceId || n.id === targetId ? 1 : 0.3);
     } else {
-      d3.select(event.currentTarget)
+      d3.select(element)
         .attr('stroke-width', d => Math.max(1, (d.weight || 1) * 1.5))
         .style('opacity', 0.6);
       g.selectAll('.graph-node').style('opacity', 1);
@@ -403,14 +399,16 @@
   }
 
   function showTooltip(event, d) {
+    const tags = d.tags || [];
+    const categories = d.categories || [];
     let html = '';
     if (d.type === 'post') {
       html = `
         <strong>${escapeHtml(d.label)}</strong>
         <div class="tooltip-meta">${d.date || ''}</div>
         <div class="tooltip-excerpt">${escapeHtml(d.excerpt)}</div>
-        ${d.tags.length ? `<div class="tooltip-tags">${d.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
-        ${d.categories.length ? `<div class="tooltip-cats">${d.categories.map(c => `<span class="cat">${escapeHtml(c)}</span>`).join('')}</div>` : ''}
+        ${tags.length ? `<div class="tooltip-tags">${tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+        ${categories.length ? `<div class="tooltip-cats">${categories.map(c => `<span class="cat">${escapeHtml(c)}</span>`).join('')}</div>` : ''}
         <div class="tooltip-action">点击查看详情</div>
       `;
     } else if (d.type === 'tag') {
@@ -421,8 +419,16 @@
 
     tooltipEl.innerHTML = html;
     tooltipEl.style.opacity = '1';
-    tooltipEl.style.left = `${event.clientX + 12}px`;
-    tooltipEl.style.top = `${event.clientY - 12}px`;
+    // tooltip 位于 .graph-canvas-wrapper（position: relative）内，
+    // 必须把视口坐标换算为相对容器的坐标，否则页面滚动后会错位
+    const wrap = document.querySelector('.graph-canvas-wrapper');
+    if (wrap) {
+      const rect = wrap.getBoundingClientRect();
+      let left = event.clientX - rect.left + 12;
+      if (left + 300 > rect.width) left = Math.max(4, event.clientX - rect.left - 312);
+      tooltipEl.style.left = `${left}px`;
+      tooltipEl.style.top = `${Math.max(4, event.clientY - rect.top - 12)}px`;
+    }
   }
 
   function hideTooltip() {
@@ -430,7 +436,7 @@
   }
 
   function fitToView() {
-    const nodes = g.selectAll('.graph-node')._data || [];
+    const nodes = currentNodes;
     if (nodes.length === 0) return;
 
     const bounds = nodes.reduce((acc, n) => {
@@ -481,7 +487,7 @@
   }
 
   function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'''}[c]));
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
   // Load D3 if not present

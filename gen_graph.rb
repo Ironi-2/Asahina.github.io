@@ -33,7 +33,7 @@ Dir.glob(File.join(posts_dir, "*.md")).each do |file|
       tags: Array(front_matter["tags"]),
       categories: categories,
       date: front_matter["date"],
-      excerpt: front_matter["excerpt"] || "",
+      excerpt: (front_matter["excerpt"] || "").to_s.gsub(/<[^>]+>/, "").gsub(/\s+/, " ").strip[0,120],
       url: url
     }
   end

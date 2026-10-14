@@ -26,7 +26,7 @@ module Jekyll
         tags = Array(post_data["tags"])
         categories = Array(post_data["categories"])
         date = post_data["date"]
-        excerpt = post_data["excerpt"] || ""
+        excerpt = (post_data["excerpt"] || "").to_s.gsub(/<[^>]+>/, "").gsub(/\s+/, " ").strip[0,120]
 
         nodes << {
           id: "post:#{slug}",
