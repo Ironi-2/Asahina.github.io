@@ -275,7 +275,13 @@
       .on('mouseenter', (event, d) => showTooltip(event, d))
       .on('mouseleave', hideTooltip);
 
-    nodeEnter.append('circle')
+    // 内层缩放组：悬停放大只作用于这一层。
+    // 外层 .graph-node 的 transform 属性由 tick 负责定位，
+    // 若直接对外层加 CSS transform（:hover scale），会覆盖掉 translate
+    // 导致节点跳转到原点、鼠标反复进入/离开而抖动
+    const nodeScale = nodeEnter.append('g').attr('class', 'graph-node-scale');
+
+    nodeScale.append('circle')
       .attr('stroke-width', 2)
       .style('filter', 'url(#glow)');
 
