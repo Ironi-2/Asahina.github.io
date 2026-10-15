@@ -1,0 +1,153 @@
+{%- comment -%}
+  知识图谱数据（构建期内嵌生成）
+  ==================================================================
+  本文件替代原 _plugins/graph_generator.rb + gen_graph.rb + assets/data/graph.json。
+
+  背景：GitHub Pages 以 safe mode 构建，不执行 _plugins/ 自定义插件，
+  静态 graph.json 必须手动重新生成并提交，改分类/标签后不会自动同步。
+  Liquid 模板在每次构建（含 GH Pages）都会执行，因此把数据生成搬进
+  include 后：修改 front matter（分类/标签）并 push，数据即自动重算。
+
+  输出：紧凑 JSON（nodes / edges / meta），由 default.html 包进
+  script#graph-data，graph.js 直接解析，不再 fetch 静态文件。
+
+  数据模型（与旧版一致）：
+  - 节点：文章（url 含 baseurl，Jekyll 原生百分号编码）/ 标签 / 分类（含 count）
+  - 边：tag、category、similarity（共享标签数 + 共享分类数 x 0.5 > 0）、
+    explicit（正文中的双方括号标题引用）
+  - 文章 excerpt：Jekyll 自动摘要剥 HTML 标签（与旧插件同源）
+{%- endcomment -%}
+
+{%- comment -%} 文章按日期升序（与旧 graph.json 节点顺序一致） {%- endcomment -%}
+{%- assign posts = site.posts | reverse -%}
+
+{%- comment -%} 汇总全部标签/分类：逗号连接后 split + uniq 去重 {%- endcomment -%}
+{%- assign tag_csv = "" -%}
+{%- assign cat_csv = "" -%}
+{%- for post in posts -%}
+  {%- for t in post.tags -%}
+    {%- if tag_csv == "" -%}{%- assign tag_csv = t -%}{%- else -%}{%- assign tag_csv = tag_csv | append: "," | append: t -%}{%- endif -%}
+  {%- endfor -%}
+  {%- for c in post.categories -%}
+    {%- if cat_csv == "" -%}{%- assign cat_csv = c -%}{%- else -%}{%- assign cat_csv = cat_csv | append: "," | append: c -%}{%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
+{%- if tag_csv == "" -%}{%- assign tag_list = "" | split: "" -%}{%- else -%}{%- assign tag_list = tag_csv | split: "," | uniq -%}{%- endif -%}
+{%- if cat_csv == "" -%}{%- assign cat_list = "" | split: "" -%}{%- else -%}{%- assign cat_list = cat_csv | split: "," | uniq -%}{%- endif -%}
+
+{%- comment -%} 文章节点 {%- endcomment -%}
+{%- capture post_nodes -%}
+  {%- for post in posts -%}
+    {%- assign grp = post.categories | first -%}
+    {%- if grp == nil or grp == "" -%}{%- assign grp = "uncategorized" -%}{%- endif -%}
+    ,{"id": {{ post.slug | prepend: "post:" | jsonify }}, "type": "post", "label": {{ post.title | jsonify }}, "url": {{ site.baseurl | append: post.url | jsonify }}, "tags": {{ post.tags | jsonify }}, "categories": {{ post.categories | jsonify }}, "date": {{ post.date | date: "%Y-%m-%d" | jsonify }}, "excerpt": {{ post.excerpt | strip_html | strip_newlines | replace: "  ", " " | strip | truncate: 120 | jsonify }}, "group": {{ grp | jsonify }}}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- assign post_nodes = post_nodes | remove_first: "," -%}
+
+{%- comment -%} 标签节点（含引用计数） {%- endcomment -%}
+{%- capture tag_nodes -%}
+  {%- for tag in tag_list -%}
+    {%- assign cnt = 0 -%}
+    {%- for post in posts -%}
+      {%- if post.tags contains tag -%}{%- assign cnt = cnt | plus: 1 -%}{%- endif -%}
+    {%- endfor -%}
+    ,{"id": {{ tag | prepend: "tag:" | jsonify }}, "type": "tag", "label": {{ tag | jsonify }}, "count": {{ cnt }}, "group": "tag"}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- assign tag_nodes = tag_nodes | remove_first: "," -%}
+
+{%- comment -%} 分类节点（含文章计数） {%- endcomment -%}
+{%- capture cat_nodes -%}
+  {%- for cat in cat_list -%}
+    {%- assign cnt = 0 -%}
+    {%- for post in posts -%}
+      {%- if post.categories contains cat -%}{%- assign cnt = cnt | plus: 1 -%}{%- endif -%}
+    {%- endfor -%}
+    ,{"id": {{ cat | prepend: "category:" | jsonify }}, "type": "category", "label": {{ cat | jsonify }}, "count": {{ cnt }}, "group": "category"}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- assign cat_nodes = cat_nodes | remove_first: "," -%}
+
+{%- comment -%} 组装 nodes：三段各自可能为空，用逗号连接 {%- endcomment -%}
+{%- assign nodes_json = post_nodes -%}
+{%- if tag_nodes != "" -%}
+  {%- if nodes_json != "" -%}{%- assign nodes_json = nodes_json | append: "," -%}{%- endif -%}
+  {%- assign nodes_json = nodes_json | append: tag_nodes -%}
+{%- endif -%}
+{%- if cat_nodes != "" -%}
+  {%- if nodes_json != "" -%}{%- assign nodes_json = nodes_json | append: "," -%}{%- endif -%}
+  {%- assign nodes_json = nodes_json | append: cat_nodes -%}
+{%- endif -%}
+
+{%- comment -%} 标签 / 分类关联边（每条前加逗号，最后统一去掉首个） {%- endcomment -%}
+{%- capture tag_edges -%}
+  {%- for post in posts -%}
+    {%- for tag in post.tags -%}
+      ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ tag | prepend: "tag:" | jsonify }}, "type": "tag"}
+    {%- endfor -%}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- capture cat_edges -%}
+  {%- for post in posts -%}
+    {%- for cat in post.categories -%}
+      ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ cat | prepend: "category:" | jsonify }}, "type": "category"}
+    {%- endfor -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- comment -%} 内容相似边：两两组合（内层索引大于外层才输出，保证每对只出现一次） {%- endcomment -%}
+{%- capture sim_edges -%}
+  {%- for post in posts -%}
+    {%- for other in posts -%}
+      {%- if forloop.index > forloop.parentloop.index -%}
+        {%- assign st_csv = "" -%}
+        {%- assign sc_csv = "" -%}
+        {%- for t in post.tags -%}
+          {%- if other.tags contains t -%}
+            {%- if st_csv == "" -%}{%- assign st_csv = t -%}{%- else -%}{%- assign st_csv = st_csv | append: "," | append: t -%}{%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- for c in post.categories -%}
+          {%- if other.categories contains c -%}
+            {%- if sc_csv == "" -%}{%- assign sc_csv = c -%}{%- else -%}{%- assign sc_csv = sc_csv | append: "," | append: c -%}{%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if st_csv == "" -%}{%- assign st_arr = "" | split: "" -%}{%- assign st_cnt = 0 -%}
+        {%- else -%}{%- assign st_arr = st_csv | split: "," -%}{%- assign st_cnt = st_arr | size -%}{%- endif -%}
+        {%- if sc_csv == "" -%}{%- assign sc_arr = "" | split: "" -%}{%- assign sc_cnt = 0 -%}
+        {%- else -%}{%- assign sc_arr = sc_csv | split: "," -%}{%- assign sc_cnt = sc_arr | size -%}{%- endif -%}
+        {%- assign sc_half = sc_cnt | times: 0.5 -%}
+        {%- assign w = st_cnt | plus: sc_half -%}
+        {%- if w > 0 -%}
+          ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ other.slug | prepend: "post:" | jsonify }}, "type": "similarity", "weight": {{ w }}, "shared_tags": {{ st_arr | jsonify }}, "shared_cats": {{ sc_arr | jsonify }}}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- comment -%} 显式引用边：扫描正文中的双方括号标题（先按 title 匹配，再按 slug） {%- endcomment -%}
+{%- capture exp_edges -%}
+  {%- for post in posts -%}
+    {%- assign chunks = post.content | split: "[[" -%}
+    {%- for chunk in chunks -%}
+      {%- unless forloop.first -%}
+        {%- assign ref = chunk | split: "]]" | first | strip -%}
+        {%- assign targets = posts | where: "title", ref -%}
+        {%- if targets.size == 0 -%}{%- assign targets = posts | where: "slug", ref -%}{%- endif -%}
+        {%- assign tp = targets | first -%}
+        {%- if tp and tp.slug != post.slug -%}
+          ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ tp.slug | prepend: "post:" | jsonify }}, "type": "explicit"}
+        {%- endif -%}
+      {%- endunless -%}
+    {%- endfor -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- assign edges_json = tag_edges | append: cat_edges | append: sim_edges | append: exp_edges | remove_first: "," -%}
+
+{%- capture graph_json -%}
+{"nodes":[{{ nodes_json }}],"edges":[{{ edges_json }}],"meta":{"generated_at":{{ site.time | date: "%Y-%m-%dT%H:%M:%S%:z" | jsonify }},"post_count":{{ posts | size }},"tag_count":{{ tag_list | size }},"category_count":{{ cat_list | size }}}}
+{%- endcapture -%}
+{{ graph_json }}

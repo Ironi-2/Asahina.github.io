@@ -63,8 +63,10 @@
 
   <script src="{{ "/assets/js/main.js" | relative_url }}"></script>
 
-  <!-- Graph JS (only on graph page) -->
+  <!-- Graph data + JS (only on graph page) -->
   {% if page.url == "/graph/" or page.url == "/Asahina.github.io/graph/" %}
+  {%- capture graph_data_json -%}{% include graph-data.html %}{%- endcapture -%}
+  <script type="application/json" id="graph-data">{{ graph_data_json | strip }}</script>
   <script src="{{ "/assets/js/graph.js" | relative_url }}"></script>
   {% endif %}
 </body>

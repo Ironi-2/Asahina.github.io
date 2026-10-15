@@ -71,12 +71,12 @@
   }
 
   async function loadGraphData() {
-    const baseUrl = window.location.pathname.includes('/Asahina.github.io/')
-      ? '/Asahina.github.io'
-      : '';
-    const response = await fetch(`${baseUrl}/assets/data/graph.json`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    graphData = await response.json();
+    // 图谱数据由 Liquid 在构建期内嵌进页面（script#graph-data，见 _includes/graph-data.html）。
+    // 不再 fetch 静态 graph.json——GH Pages 不运行自定义插件，静态文件无法随
+    // front matter 变更自动同步；内嵌后每次构建（含 push 后的 GH Pages）都会重算。
+    const el = document.getElementById('graph-data');
+    if (!el) throw new Error('graph-data element not found');
+    graphData = JSON.parse(el.textContent);
     console.log('Graph loaded:', graphData.meta);
   }
 

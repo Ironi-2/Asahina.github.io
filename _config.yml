@@ -37,10 +37,6 @@ exclude:
   - README.md
   - LICENSE.md
   - Temp
-  - gen_graph.rb
-
-# Graph Generator
-graph_enabled: true
 
 # Default author
 default_author:
