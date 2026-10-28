@@ -48,7 +48,7 @@
 {% endif %}
 </head>
 
-<body>
+<body{% if page.body_class %} class="{{ page.body_class }}"{% endif %}>
   <a class="skip-link" href="#main-content">跳到主内容</a>
 
   {% include header.html %}

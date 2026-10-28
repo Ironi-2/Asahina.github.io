@@ -40,6 +40,12 @@
   let selectedNode = null;
   let currentNodes = [];
   let currentEdges = [];
+  let viewport = { width: 0, height: 0 };
+  let resizeObserver = null;
+  let resizeRaf = 0;
+  let resizeTimer = 0;
+  let pendingFit = false;
+  let layoutScale = 1;
 
   // DOM Elements
   const svgEl = document.getElementById('graph-svg');
@@ -81,15 +87,14 @@
   }
 
   function setupSVG() {
-    const container = document.querySelector('.graph-canvas-wrapper');
-    const rect = container.getBoundingClientRect();
-    const width = rect.width || 800;
-    const height = rect.height || 600;
+    // 画布尺寸 = 容器实际像素尺寸；全屏布局下即“视口高度 - 站点头栏”
+    viewport = measureViewport();
 
     svg = d3.select('#graph-svg')
-      .attr('width', width)
-      .attr('height', height)
-      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('width', viewport.width)
+      .attr('height', viewport.height)
+      .attr('viewBox', `0 0 ${viewport.width} ${viewport.height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
       .style('cursor', 'grab');
 
     // Define gradients and markers
@@ -146,6 +151,8 @@
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
+        // 用户一旦手动缩放/平移，就取消“模拟稳定后自动适应视野”
+        if (event.sourceEvent) pendingFit = false;
       });
 
     svg.call(zoom);
@@ -153,6 +160,7 @@
     // Double-click to reset zoom
     svg.on('dblclick.zoom', null);
     svg.on('dblclick', () => {
+      pendingFit = false;
       svg.transition().duration(500).call(
         zoom.transform,
         d3.zoomIdentity
@@ -164,6 +172,137 @@
       .on('start', () => svg.style('cursor', 'grabbing'))
       .on('end', () => svg.style('cursor', 'grab'))
     );
+
+    observeResize();
+  }
+
+  // 画布尺寸：始终取容器实际像素尺寸，避免窗口缩放后 viewBox 与实际显示区域脱节
+  function measureViewport() {
+    const wrapper = document.querySelector('.graph-canvas-wrapper');
+    const rect = wrapper ? wrapper.getBoundingClientRect() : null;
+    const width = rect && rect.width ? rect.width : window.innerWidth;
+    const height = rect && rect.height ? rect.height : window.innerHeight - 64;
+    return {
+      width: Math.max(320, Math.round(width)),
+      height: Math.max(320, Math.round(height))
+    };
+  }
+
+  // 监听容器尺寸变化：窗口缩放、移动端旋转、浏览器地址栏收展都能覆盖
+  function observeResize() {
+    const wrapper = document.querySelector('.graph-canvas-wrapper');
+    if (!wrapper) return;
+
+    const schedule = () => {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0;
+        handleResize();
+      });
+    };
+
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(schedule);
+      resizeObserver.observe(wrapper);
+    } else {
+      window.addEventListener('resize', schedule);
+      window.addEventListener('orientationchange', schedule);
+    }
+  }
+
+  function handleResize() {
+    if (!svg || !zoom) return;
+
+    const next = measureViewport();
+    if (next.width === viewport.width && next.height === viewport.height) return;
+
+    const dx = (next.width - viewport.width) / 2;
+    const dy = (next.height - viewport.height) / 2;
+    viewport = next;
+
+    svg.attr('width', next.width)
+      .attr('height', next.height)
+      .attr('viewBox', `0 0 ${next.width} ${next.height}`);
+
+    if (simulation) {
+      // 布局坐标跟随新画布中心平移，避免尺寸变化后整块图谱偏向一侧
+      if (dx || dy) {
+        simulation.nodes().forEach(n => {
+          if (typeof n.x === 'number') n.x += dx;
+          if (typeof n.y === 'number') n.y += dy;
+        });
+      }
+      simulation.force('center', d3.forceCenter(next.width / 2, next.height / 2)
+        .strength(CONFIG.forces[currentLayout].centerForce));
+      redraw();
+    }
+
+    // 拖动窗口时只在停下来后重新适应一次视野
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(fitToView, 160);
+  }
+
+  // 重绘节点与连线（不推进模拟，供尺寸变化后立即更新使用）
+  function redraw() {
+    if (!g) return;
+    g.selectAll('.graph-link')
+      .attr('x1', d => (d.source.x ?? 0))
+      .attr('y1', d => (d.source.y ?? 0))
+      .attr('x2', d => (d.target.x ?? 0))
+      .attr('y2', d => (d.target.y ?? 0));
+
+    g.selectAll('.graph-node')
+      .attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+  }
+
+  // 宽屏上把布局横向拉开一些，避免整块图谱只占中间一条
+  function spreadWide() {
+    const nodes = currentNodes;
+    if (!nodes.length || !viewport.height) return;
+
+    const aspect = viewport.width / viewport.height;
+    if (aspect < 1.2) return; // 接近方形或竖屏不处理
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      if (typeof n.x !== 'number' || typeof n.y !== 'number') return;
+      minX = Math.min(minX, n.x);
+      maxX = Math.max(maxX, n.x);
+      minY = Math.min(minY, n.y);
+      maxY = Math.max(maxY, n.y);
+    });
+
+    const spanX = maxX - minX;
+    const spanY = maxY - minY;
+    if (!isFinite(spanX) || spanX <= 1 || spanY <= 1) return;
+
+    const currentAspect = spanX / spanY;
+    const targetAspect = Math.min(1.9, aspect * 0.82);
+    if (targetAspect <= currentAspect * 1.05) return;
+
+    const factor = Math.min(1.7, targetAspect / currentAspect);
+    const cx = (minX + maxX) / 2;
+    nodes.forEach(n => {
+      if (typeof n.x === 'number') n.x = cx + (n.x - cx) * factor;
+    });
+  }
+
+  // 大画布上放大布局尺度，避免整个图谱缩在中间一小块
+  function getLayoutScale(width, height) {
+    const ratio = Math.sqrt((width * height) / (1280 * 720));
+    return Math.min(1.7, Math.max(0.85, ratio));
+  }
+
+  // 顶部/底部浮层占用的高度，供 fitToView 留出可视空间
+  function overlayInsets() {
+    const containerEl = document.querySelector('.graph-container');
+    if (!containerEl) return { top: 0, bottom: 0 };
+    const base = containerEl.getBoundingClientRect();
+    const topEl = document.querySelector('.graph-topbar');
+    const bottomEl = document.querySelector('.graph-bottombar');
+    const top = topEl ? Math.max(0, topEl.getBoundingClientRect().bottom - base.top) : 0;
+    const bottom = bottomEl ? Math.max(0, base.bottom - bottomEl.getBoundingClientRect().top) : 0;
+    return { top: top + 12, bottom: bottom + 12 };
   }
 
   function setupControls() {
@@ -183,6 +322,7 @@
     });
 
     resetViewBtn?.addEventListener('click', () => {
+      pendingFit = false;
       svg.transition().duration(500).call(
         zoom.transform,
         d3.zoomIdentity
@@ -197,8 +337,9 @@
     if (simulation) simulation.stop();
 
     const { nodes, edges } = graphData;
-    const width = +svg.attr('width');
-    const height = +svg.attr('height');
+    const width = viewport.width || +svg.attr('width') || 800;
+    const height = viewport.height || +svg.attr('height') || 600;
+    layoutScale = getLayoutScale(width, height);
 
     // Filter nodes
     let filteredNodes = nodes;
@@ -228,17 +369,27 @@
     simulation = d3.forceSimulation(filteredNodes)
       .force('link', d3.forceLink(filteredEdges)
         .id(d => d.id)
-        .distance(d => forceConfig.linkDistance / Math.sqrt(d.weight || 1))
+        .distance(d => (forceConfig.linkDistance * layoutScale) / Math.sqrt(d.weight || 1))
         .strength(0.7))
       .force('charge', d3.forceManyBody()
-        .strength(forceConfig.charge)
-        .distanceMax(300))
+        .strength(forceConfig.charge * layoutScale * layoutScale)
+        .distanceMax(300 * layoutScale))
       .force('center', d3.forceCenter(width / 2, height / 2)
         .strength(forceConfig.centerForce))
       .force('collision', d3.forceCollide()
         .radius(d => getNodeRadius(d) + 4)
         .strength(0.5))
-      .on('tick', ticked);
+      .on('tick', ticked)
+      .on('end', () => {
+        if (!pendingFit) return;
+        pendingFit = false;
+        spreadWide();
+        redraw();
+        fitToView();
+      });
+
+    // 首次渲染 / 切换筛选或布局后，等模拟稳定再自动适应视野
+    pendingFit = true;
 
     // Draw edges
     const link = g.selectAll('.graph-link')
@@ -299,24 +450,17 @@
       .attr('stroke', d => CONFIG.colors[d.type]);
     nodeAll.select('text')
       .text(d => d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label)
+      .attr('dy', d => getNodeRadius(d) + 14)
       .style('opacity', d => d.type === 'post' ? 0 : 1);
 
     function ticked() {
-      // Update edges
-      g.selectAll('.graph-link')
-        .attr('x1', d => (d.source.x ?? 0))
-        .attr('y1', d => (d.source.y ?? 0))
-        .attr('x2', d => (d.target.x ?? 0))
-        .attr('y2', d => (d.target.y ?? 0));
-
-      // Update nodes
-      g.selectAll('.graph-node')
-        .attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+      redraw();
     }
 
     function drag(sim) {
       return d3.drag()
         .on('start', (event, d) => {
+          pendingFit = false; // 用户拖动节点后不再自动适应视野
           if (!event.active) sim.alphaTarget(0.3).restart();
           d.fx = d.x;
           d.fy = d.y;
@@ -335,7 +479,9 @@
     function getNodeRadius(d) {
       const cfg = CONFIG.nodeSize[d.type] || CONFIG.nodeSize.post;
       const count = d.count || 1;
-      return cfg.base + Math.min(cfg.scale, Math.log(count + 1) * 2);
+      const base = cfg.base + Math.min(cfg.scale, Math.log(count + 1) * 2);
+      // 节点半径随画布尺度轻微放大，避免大屏上节点显得过小
+      return base * Math.pow(layoutScale, 0.5);
     }
   }
 
@@ -443,7 +589,7 @@
 
   function fitToView() {
     const nodes = currentNodes;
-    if (nodes.length === 0) return;
+    if (!svg || !zoom || nodes.length === 0) return;
 
     const bounds = nodes.reduce((acc, n) => {
       const r = getNodeRadius(n);
@@ -455,24 +601,35 @@
       };
     }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
 
-    const width = +svg.attr('width');
-    const height = +svg.attr('height');
-    const dx = bounds.maxX - bounds.minX;
-    const dy = bounds.maxY - bounds.minY;
-    const scale = Math.min(width / dx, height / dy) * 0.85;
+    const width = viewport.width || +svg.attr('width') || 800;
+    const height = viewport.height || +svg.attr('height') || 600;
+
+    // 顶部/底部浮层会遮挡画布，适应视野时把它们的高度让出来
+    const inset = overlayInsets();
+    const padX = 24;
+    const availW = Math.max(160, width - padX * 2);
+    const availH = Math.max(160, height - inset.top - inset.bottom);
+
+    const dx = Math.max(1, bounds.maxX - bounds.minX);
+    const dy = Math.max(1, bounds.maxY - bounds.minY);
+    const scale = Math.min(2.5, Math.max(0.1, Math.min(availW / dx, availH / dy) * 0.92));
+
     const cx = (bounds.minX + bounds.maxX) / 2;
     const cy = (bounds.minY + bounds.maxY) / 2;
+    const offsetX = padX + availW / 2;
+    const offsetY = inset.top + availH / 2;
 
-    svg.transition().duration(750).call(
+    svg.transition().duration(650).ease(d3.easeCubicOut).call(
       zoom.transform,
-      d3.zoomIdentity.translate(width / 2, height / 2).scale(scale).translate(-cx, -cy)
+      d3.zoomIdentity.translate(offsetX, offsetY).scale(scale).translate(-cx, -cy)
     );
   }
 
   function getNodeRadius(d) {
     const cfg = CONFIG.nodeSize[d.type] || CONFIG.nodeSize.post;
     const count = d.count || 1;
-    return cfg.base + Math.min(cfg.scale, Math.log(count + 1) * 2);
+    const base = cfg.base + Math.min(cfg.scale, Math.log(count + 1) * 2);
+    return base * Math.pow(layoutScale, 0.5);
   }
 
   function updateStats() {
