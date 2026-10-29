@@ -108,7 +108,9 @@
 (function() {
   const observerOptions = {
     root: null,
-    rootMargin: '0px 0px -10% 0px',
+    // 只留 5% 的触发余量：标题刚进入视口就显示，
+    // 避免首屏底部出现“标题还透明、下面的列表已经显示”的断层
+    rootMargin: '0px 0px -5% 0px',
     threshold: 0.1
   };
 
