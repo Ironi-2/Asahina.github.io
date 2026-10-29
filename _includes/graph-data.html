@@ -14,7 +14,7 @@
   数据模型（与旧版一致）：
   - 节点：文章（url 含 baseurl，Jekyll 原生百分号编码）/ 标签 / 分类（含 count）
   - 边：tag、category、similarity（共享标签数 + 共享分类数 x 0.5 > 0）、
-    explicit（正文中的双方括号标题引用）
+    explicit（正文中的双方括号标题引用，或指向站内文章的普通链接）
   - 文章 excerpt：Jekyll 自动摘要剥 HTML 标签（与旧插件同源）
 {%- endcomment -%}
 
@@ -127,9 +127,17 @@
   {%- endfor -%}
 {%- endcapture -%}
 
-{%- comment -%} 显式引用边：扫描正文中的双方括号标题（先按 title 匹配，再按 slug） {%- endcomment -%}
+{%- comment -%}
+  显式引用边，两种写法都认：
+  1) 正文里的 [[标题]] / [[slug]]（可以放在 HTML 注释里，不显示给读者）
+  2) 正文里指向本站文章的普通链接 <a href="...">（渲染后的 URL 与 post.url 精确比对）
+  同一对文章只保留一条边，避免重复画线。
+{%- endcomment -%}
 {%- capture exp_edges -%}
   {%- for post in posts -%}
+    {%- assign seen = "|" -%}
+
+    {%- comment -%} 1) 双方括号引用 {%- endcomment -%}
     {%- assign chunks = post.content | split: "[[" -%}
     {%- for chunk in chunks -%}
       {%- unless forloop.first -%}
@@ -138,8 +146,32 @@
         {%- if targets.size == 0 -%}{%- assign targets = posts | where: "slug", ref -%}{%- endif -%}
         {%- assign tp = targets | first -%}
         {%- if tp and tp.slug != post.slug -%}
-          ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ tp.slug | prepend: "post:" | jsonify }}, "type": "explicit"}
+          {%- assign key = "|" | append: tp.slug | append: "|" -%}
+          {%- unless seen contains key -%}
+            {%- assign seen = seen | append: tp.slug | append: "|" -%}
+            ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ tp.slug | prepend: "post:" | jsonify }}, "type": "explicit"}
+          {%- endunless -%}
         {%- endif -%}
+      {%- endunless -%}
+    {%- endfor -%}
+
+    {%- comment -%} 2) 正文内的站内文章链接 {%- endcomment -%}
+    {%- assign hrefs = post.content | split: 'href="' -%}
+    {%- for frag in hrefs -%}
+      {%- unless forloop.first -%}
+        {%- assign href = frag | split: '"' | first -%}
+        {%- for other in posts -%}
+          {%- assign other_url = site.baseurl | append: other.url -%}
+          {%- if href == other_url or href == other.url -%}
+            {%- if other.slug != post.slug -%}
+              {%- assign key = "|" | append: other.slug | append: "|" -%}
+              {%- unless seen contains key -%}
+                {%- assign seen = seen | append: other.slug | append: "|" -%}
+                ,{"source": {{ post.slug | prepend: "post:" | jsonify }}, "target": {{ other.slug | prepend: "post:" | jsonify }}, "type": "explicit"}
+              {%- endunless -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
       {%- endunless -%}
     {%- endfor -%}
   {%- endfor -%}
