@@ -105,10 +105,12 @@
       defs.append('marker')
         .attr('id', `arrow-${type}`)
         .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 20)
+        .attr('refX', 10)
         .attr('refY', 0)
-        .attr('markerWidth', 6)
-        .attr('markerHeight', 6)
+        .attr('markerWidth', 8)
+        .attr('markerHeight', 8)
+        // 固定像素尺寸，不随线宽缩放；否则细线上的箭头会缩进节点里被盖住
+        .attr('markerUnits', 'userSpaceOnUse')
         .attr('orient', 'auto')
         .append('path')
         .attr('d', 'M0,-5L10,0L0,5')
@@ -245,11 +247,32 @@
   // 重绘节点与连线（不推进模拟，供尺寸变化后立即更新使用）
   function redraw() {
     if (!g) return;
-    g.selectAll('.graph-link')
-      .attr('x1', d => (d.source.x ?? 0))
-      .attr('y1', d => (d.source.y ?? 0))
-      .attr('x2', d => (d.target.x ?? 0))
-      .attr('y2', d => (d.target.y ?? 0));
+
+    g.selectAll('.graph-link').each(function (d) {
+      const sx = d.source.x ?? 0;
+      const sy = d.source.y ?? 0;
+      const tx = d.target.x ?? 0;
+      const ty = d.target.y ?? 0;
+      const dx = tx - sx;
+      const dy = ty - sy;
+      const len = Math.hypot(dx, dy);
+      const k = len || 1;
+      let os = 0;
+      let ot = 0;
+
+      if (len > 0.5) {
+        // 线止于节点边缘（各留 1~2px），箭头才不会被节点圆盖住
+        const maxOffset = Math.max(0, (len - 1) / 2);
+        os = Math.min(getNodeRadius(d.source) + 1, maxOffset);
+        ot = Math.min(getNodeRadius(d.target) + 2, maxOffset);
+      }
+
+      d3.select(this)
+        .attr('x1', sx + (dx / k) * os)
+        .attr('y1', sy + (dy / k) * os)
+        .attr('x2', tx - (dx / k) * ot)
+        .attr('y2', ty - (dy / k) * ot);
+    });
 
     g.selectAll('.graph-node')
       .attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
