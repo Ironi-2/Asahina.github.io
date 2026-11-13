@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asahina 写作台</title>
+  <link rel="stylesheet" href="/vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="/vendor/github-dark.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7L12 19"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M7 7h4v6H5v-2a4 4 0 0 1 2-4Z"/><path d="M15 7h4v6h-6v-2a4 4 0 0 1 2-4Z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
+    <symbol id="i-ordered" viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4-4a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 2.8 0l5.2 5.2a2 2 0 0 1 0 2.8L13 21"/><line x1="22" y1="21" x2="7" y2="21"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+    <symbol id="i-caret" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <button id="sidebar-toggle" class="icon-btn only-mobile" title="草稿与设置">
+      <svg class="icon"><use href="#i-menu"/></svg>
+    </button>
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div class="brand-text">
+        <strong>Asahina 写作台</strong>
+        <span>本地博客编辑器</span>
+      </div>
+    </div>
+
+    <div class="topbar-state">
+      <span id="save-dot" class="save-dot"></span>
+      <span id="save-text">未保存</span>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="preview-toggle" class="icon-btn only-mobile" title="切换预览">
+        <svg class="icon"><use href="#i-eye"/></svg>
+      </button>
+      <div class="segmented" id="mode-switch" role="group" aria-label="编辑模式">
+        <button type="button" data-mode="rich" class="active">富文本</button>
+        <button type="button" data-mode="md">Markdown</button>
+      </div>
+      <button id="theme-btn" class="icon-btn" title="切换深色/浅色">
+        <svg class="icon icon-sun"><use href="#i-sun"/></svg>
+        <svg class="icon icon-moon"><use href="#i-moon"/></svg>
+      </button>
+
+      <div class="menu-wrap">
+        <button id="export-btn" class="btn ghost">
+          导出
+          <svg class="icon caret"><use href="#i-caret"/></svg>
+        </button>
+        <div id="export-menu" class="menu hidden">
+          <button data-export="md"><svg class="icon"><use href="#i-download"/></svg>下载 Markdown</button>
+          <button data-export="copy">复制 Markdown</button>
+          <button data-export="frontmatter">复制含 Front Matter 全文</button>
+        </div>
+      </div>
+
+      <button id="save-draft-btn" class="btn ghost">保存草稿</button>
+
+      <div class="menu-wrap">
+        <button id="publish-btn" class="btn primary">发布到博客</button>
+        <button id="publish-caret" class="btn primary split" aria-label="更多发布选项">
+          <svg class="icon caret"><use href="#i-caret"/></svg>
+        </button>
+        <div id="publish-menu" class="menu right hidden">
+          <button data-publish="save"><strong>仅保存到 _posts</strong><small>写入本地文章文件，不提交</small></button>
+          <button data-publish="push"><strong>保存并推送上线</strong><small>git add / commit / push origin main</small></button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <section class="side-block">
+        <div class="side-title">
+          <span>草稿箱</span>
+          <button id="new-draft" class="link-btn">新建</button>
+        </div>
+        <div id="draft-list" class="draft-list">
+          <div class="side-empty">暂无草稿</div>
+        </div>
+      </section>
+
+      <section class="side-block">
+        <div class="side-title"><span>文章设置</span></div>
+        <label class="field">
+          <span>URL 文件名</span>
+          <input id="meta-slug" placeholder="留空则由标题生成" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>发布时间</span>
+          <input id="meta-date" type="datetime-local">
+        </label>
+
+        <div class="field">
+          <span>分类</span>
+          <div id="category-chips" class="chips"></div>
+          <input id="category-input" list="category-options" placeholder="输入后回车" autocomplete="off">
+          <datalist id="category-options"></datalist>
+        </div>
+
+        <div class="field">
+          <span>标签</span>
+          <div id="tag-chips" class="chips"></div>
+          <input id="tag-input" list="tag-options" placeholder="输入后回车" autocomplete="off">
+          <datalist id="tag-options"></datalist>
+        </div>
+
+        <label class="field">
+          <span>摘要</span>
+          <textarea id="meta-excerpt" rows="3" placeholder="留空则自动截取正文"></textarea>
+        </label>
+
+        <label class="check-row">
+          <input type="checkbox" id="meta-comments" checked>
+          <span>开启评论</span>
+        </label>
+
+        <div class="field">
+          <span>封面图</span>
+          <div id="cover-preview" class="cover-preview">
+            <span>未选择封面</span>
+          </div>
+          <div class="cover-actions">
+            <button id="cover-btn" class="mini">上传封面</button>
+            <button id="cover-clear" class="mini danger">清除</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="side-block">
+        <div class="side-title">
+          <span>打开已有文章</span>
+          <span id="post-count" class="side-count"></span>
+        </div>
+        <input id="post-search" class="side-search" placeholder="搜索标题" autocomplete="off">
+        <div id="post-list" class="post-list"></div>
+      </section>
+    </aside>
+
+    <main class="workspace" id="workspace">
+      <section class="pane editor-pane">
+        <div class="doc-head">
+          <input id="post-title" class="title-input" placeholder="文章标题" autocomplete="off">
+          <div class="doc-sub">
+            <span id="file-preview">2026-10-29-untitled.md</span>
+            <span class="dot-sep"></span>
+            <span id="draft-label">新文章</span>
+          </div>
+        </div>
+
+        <div class="toolbar" id="toolbar">
+          <button class="tb" data-cmd="undo" title="撤销 (Ctrl+Z)"><svg class="icon"><use href="#i-undo"/></svg></button>
+          <button class="tb" data-cmd="redo" title="重做 (Ctrl+Shift+Z)"><svg class="icon"><use href="#i-redo"/></svg></button>
+          <span class="tb-sep"></span>
+          <button class="tb text" data-block="h2" title="二级标题">H2</button>
+          <button class="tb text" data-block="h3" title="三级标题">H3</button>
+          <span class="tb-sep"></span>
+          <button class="tb" data-cmd="bold" title="加粗 (Ctrl+B)"><b>B</b></button>
+          <button class="tb" data-cmd="italic" title="斜体 (Ctrl+I)"><i>I</i></button>
+          <button class="tb" data-cmd="strikeThrough" title="删除线"><s>S</s></button>
+          <button class="tb" data-cmd="formatBlock" data-value="blockquote" title="引用"><svg class="icon"><use href="#i-quote"/></svg></button>
+          <span class="tb-sep"></span>
+          <button class="tb" data-cmd="insertUnorderedList" title="无序列表"><svg class="icon"><use href="#i-list"/></svg></button>
+          <button class="tb" data-cmd="insertOrderedList" title="有序列表"><svg class="icon"><use href="#i-ordered"/></svg></button>
+          <button class="tb" data-action="link" title="插入链接"><svg class="icon"><use href="#i-link"/></svg></button>
+          <button class="tb" data-action="image" title="上传图片"><svg class="icon"><use href="#i-image"/></svg></button>
+          <span class="tb-sep"></span>
+          <button class="tb" data-action="code" title="插入代码块"><svg class="icon"><use href="#i-code"/></svg></button>
+          <button class="tb" data-action="table" title="插入表格"><svg class="icon"><use href="#i-table"/></svg></button>
+          <button class="tb" data-action="hr" title="分隔线"><svg class="icon"><use href="#i-minus"/></svg></button>
+          <button class="tb" data-action="clear" title="清除格式"><svg class="icon"><use href="#i-eraser"/></svg></button>
+        </div>
+
+        <div class="editor-scroll" id="editor-scroll">
+          <div id="rich-editor" class="rich-editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true"></div>
+          <textarea id="md-editor" class="md-editor hidden" spellcheck="false" placeholder="在这里写 Markdown，右侧实时预览…"></textarea>
+          <div id="drop-hint" class="drop-hint hidden">松开鼠标上传图片</div>
+        </div>
+
+        <div class="editor-foot">
+          <span id="mode-hint">富文本模式 · Markdown 自动同步</span>
+          <span id="cursor-info">0 字</span>
+        </div>
+      </section>
+
+      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"></div>
+
+      <section class="pane preview-pane">
+        <div class="preview-head">
+          <span>实时预览</span>
+          <span id="preview-stat">草稿</span>
+        </div>
+        <div class="preview-scroll">
+          <article id="preview" class="preview">
+            <div class="preview-empty">
+              <strong>开始写第一篇文章</strong>
+              <p>左侧输入内容，这里会按博客样式实时渲染。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="statusbar">
+    <span id="status-left">草稿保存在 editor/.drafts</span>
+    <span id="word-count">0 字</span>
+    <span>Ctrl+S 保存草稿</span>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="modal-root"></div>
+
+  <input type="file" id="image-input" accept="image/*" hidden>
+  <input type="file" id="cover-input" accept="image/*" hidden>
+
+  <script src="/vendor/marked.umd.js"></script>
+  <script src="/vendor/turndown.js"></script>
+  <script src="/vendor/purify.min.js"></script>
+  <script src="/vendor/highlight.min.js"></script>
+  <script src="/vendor/katex/katex.min.js"></script>
+  <script src="/vendor/katex/auto-render.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

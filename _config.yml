@@ -37,6 +37,7 @@ exclude:
   - README.md
   - LICENSE.md
   - Temp
+  - editor
 
 # Default author
 default_author:

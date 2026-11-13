@@ -5,7 +5,7 @@ Temp/
 
 # Ruby / Bundler
 .bundle/
-vendor/
+/vendor/
 
 # 系统文件
 .DS_Store
