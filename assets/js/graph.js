@@ -40,6 +40,7 @@
   let selectedNode = null;
   let currentNodes = [];
   let currentEdges = [];
+  let currentLayoutEdges = [];
   let viewport = { width: 0, height: 0 };
   let resizeObserver = null;
   let resizeRaf = 0;
@@ -227,21 +228,33 @@
       .attr('viewBox', `0 0 ${next.width} ${next.height}`);
 
     if (simulation) {
-      // 布局坐标跟随新画布中心平移，避免尺寸变化后整块图谱偏向一侧
-      if (dx || dy) {
-        simulation.nodes().forEach(n => {
-          if (typeof n.x === 'number') n.x += dx;
-          if (typeof n.y === 'number') n.y += dy;
-        });
+      if (currentLayout === 'hierarchical') {
+        // 层级布局按新画布尺寸重新计算三列坐标，再让力模拟把节点带过去
+        assignHierarchyTargets(simulation.nodes(), currentLayoutEdges, next.width, next.height);
+        // forceX/forceY 在 initialize 时缓存目标坐标，改了 _targetX 后必须重建
+        simulation.force('x', d3.forceX(n => n._targetX ?? next.width / 2).strength(0.9));
+        simulation.force('y', d3.forceY(n => n._targetY ?? next.height / 2).strength(0.85));
+        simulation.alpha(0.6).restart();
+        pendingFit = true;
+      } else {
+        // 布局坐标跟随新画布中心平移，避免尺寸变化后整块图谱偏向一侧
+        if (dx || dy) {
+          simulation.nodes().forEach(n => {
+            if (typeof n.x === 'number') n.x += dx;
+            if (typeof n.y === 'number') n.y += dy;
+          });
+        }
+        simulation.force('center', d3.forceCenter(next.width / 2, next.height / 2)
+          .strength(CONFIG.forces[currentLayout].centerForce));
       }
-      simulation.force('center', d3.forceCenter(next.width / 2, next.height / 2)
-        .strength(CONFIG.forces[currentLayout].centerForce));
       redraw();
     }
 
     // 拖动窗口时只在停下来后重新适应一次视野
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(fitToView, 160);
+    if (currentLayout !== 'hierarchical') {
+      resizeTimer = setTimeout(fitToView, 160);
+    }
   }
 
   // 重绘节点与连线（不推进模拟，供尺寸变化后立即更新使用）
@@ -355,6 +368,124 @@
     fitViewBtn?.addEventListener('click', fitToView);
   }
 
+  // 真正的层级布局：分类在左、文章在中、标签在右；文章按分类分组纵向排列
+  function assignHierarchyTargets(nodes, edges, width, height) {
+    const categories = nodes.filter(n => n.type === 'category');
+    const posts = nodes.filter(n => n.type === 'post');
+    const tags = nodes.filter(n => n.type === 'tag');
+    const presentTypes = ['category', 'post', 'tag'].filter(type => nodes.some(n => n.type === type));
+
+    const xFor = {};
+    if (presentTypes.length <= 1) {
+      presentTypes.forEach(type => { xFor[type] = width / 2; });
+    } else if (presentTypes.length === 2) {
+      xFor[presentTypes[0]] = width * 0.3;
+      xFor[presentTypes[1]] = width * 0.7;
+    } else {
+      xFor.category = width * 0.16;
+      xFor.post = width * 0.5;
+      xFor.tag = width * 0.84;
+    }
+
+    const top = Math.max(110, height * 0.14);
+    const bottom = height - Math.max(80, height * 0.12);
+    const centerY = (top + bottom) / 2;
+
+    const edgeIds = edge => ({
+      source: edge.source && edge.source.id ? edge.source.id : edge.source,
+      target: edge.target && edge.target.id ? edge.target.id : edge.target
+    });
+
+    if (!posts.length) {
+      // 只筛选分类或标签时，按数量均分纵向空间
+      categories.forEach((category, i) => {
+        category._targetX = xFor.category ?? width / 2;
+        category._targetY = top + ((i + 0.5) * (bottom - top)) / Math.max(1, categories.length);
+      });
+      tags.forEach((tag, i) => {
+        tag._targetX = xFor.tag ?? width / 2;
+        tag._targetY = top + ((i + 0.5) * (bottom - top)) / Math.max(1, tags.length);
+      });
+    } else {
+      // 按第一分类把文章分组；每个有文章的组占一条纵向带
+      const groups = new Map();
+      posts.forEach(post => {
+        const key = post.group || (post.categories && post.categories[0]) || '未分类';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(post);
+      });
+      groups.forEach(list => {
+        list.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+      });
+
+      const keys = [...groups.keys()];
+      const weights = keys.map(key => Math.max(1, groups.get(key).length));
+      const gap = keys.length > 1 ? Math.min(38, (bottom - top) * 0.06) : 0;
+      const usable = Math.max(1, (bottom - top) - gap * Math.max(0, keys.length - 1));
+      const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+      const categoryByLabel = new Map(categories.map(category => [category.label, category]));
+      const bandedCategories = new Set();
+      let cursor = top;
+
+      keys.forEach((key, index) => {
+        const list = groups.get(key);
+        const band = usable * (weights[index] / totalWeight);
+        const category = categoryByLabel.get(key);
+
+        if (category) {
+          category._targetX = xFor.category ?? width / 2;
+          category._targetY = cursor + band / 2;
+          bandedCategories.add(category);
+        }
+
+        list.forEach((post, i) => {
+          post._targetX = xFor.post ?? width / 2;
+          post._targetY = cursor + band * ((i + 0.5) / Math.max(1, list.length));
+        });
+
+        cursor += band + gap;
+      });
+
+      const postById = new Map(posts.map(post => [post.id, post]));
+
+      // 没有作为“第一分类”出现的分类（例如多分类文章的第二分类）
+      // 不单独占一条带，而是贴近与它相连的文章，避免底部出现空带
+      const orphanCategories = categories.filter(category => !bandedCategories.has(category));
+      orphanCategories.forEach((category, index) => {
+        const ys = [];
+        edges.forEach(edge => {
+          const { source, target } = edgeIds(edge);
+          if (source === category.id && postById.has(target)) ys.push(postById.get(target)._targetY);
+          else if (target === category.id && postById.has(source)) ys.push(postById.get(source)._targetY);
+        });
+        const offset = (index - (orphanCategories.length - 1) / 2) * 26;
+        category._targetX = xFor.category ?? width / 2;
+        category._targetY = (ys.length
+          ? ys.reduce((sum, value) => sum + value, 0) / ys.length
+          : centerY) + offset;
+      });
+
+      // 标签放在与其相连文章的平均高度上，保持“标签在外层”的放射感
+      tags.forEach(tag => {
+        const linked = [];
+        edges.forEach(edge => {
+          const { source, target } = edgeIds(edge);
+          if (source === tag.id && postById.has(target)) linked.push(postById.get(target));
+          else if (target === tag.id && postById.has(source)) linked.push(postById.get(source));
+        });
+        const ys = linked.map(post => post._targetY).filter(value => typeof value === 'number');
+        tag._targetX = xFor.tag ?? width / 2;
+        tag._targetY = ys.length ? ys.reduce((sum, value) => sum + value, 0) / ys.length : centerY;
+      });
+    }
+
+    // 兜底，避免任何节点没有目标坐标
+    nodes.forEach(node => {
+      if (typeof node._targetX !== 'number') node._targetX = width / 2;
+      if (typeof node._targetY !== 'number') node._targetY = centerY;
+    });
+  }
+
   function renderGraph() {
     if (!graphData) return;
     if (simulation) simulation.stop();
@@ -374,42 +505,70 @@
     // Filter edges
     // 注意：forceLink 会把 source/target 从 id 字符串替换为节点对象，
     // 二次渲染时必须先取出 id 再比对，否则连线会被全部过滤掉
-    let filteredEdges = edges.filter(e => {
+    const layoutEdges = edges.filter(e => {
       const s = e.source.id || e.source;
       const t = e.target.id || e.target;
       return filteredNodeIds.has(s) && filteredNodeIds.has(t);
     });
+    let filteredEdges = layoutEdges;
     if (edgeFilter !== 'all') {
-      filteredEdges = filteredEdges.filter(e => e.type === edgeFilter);
+      filteredEdges = layoutEdges.filter(e => e.type === edgeFilter);
     }
 
     currentNodes = filteredNodes;
     currentEdges = filteredEdges;
+    currentLayoutEdges = layoutEdges;
 
-    // Create simulation
-    const forceConfig = CONFIG.forces[currentLayout];
+    const onSimulationEnd = () => {
+      if (!pendingFit) return;
+      pendingFit = false;
+      if (currentLayout !== 'hierarchical') spreadWide();
+      redraw();
+      fitToView();
+    };
 
-    simulation = d3.forceSimulation(filteredNodes)
-      .force('link', d3.forceLink(filteredEdges)
-        .id(d => d.id)
-        .distance(d => (forceConfig.linkDistance * layoutScale) / Math.sqrt(d.weight || 1))
-        .strength(0.7))
-      .force('charge', d3.forceManyBody()
-        .strength(forceConfig.charge * layoutScale * layoutScale)
-        .distanceMax(300 * layoutScale))
-      .force('center', d3.forceCenter(width / 2, height / 2)
-        .strength(forceConfig.centerForce))
-      .force('collision', d3.forceCollide()
-        .radius(d => getNodeRadius(d) + 4)
-        .strength(0.5))
-      .on('tick', ticked)
-      .on('end', () => {
-        if (!pendingFit) return;
-        pendingFit = false;
-        spreadWide();
-        redraw();
-        fitToView();
+    if (currentLayout === 'hierarchical') {
+      // 真正的层级：分类 → 文章 → 标签三列，文章按分类分组
+      assignHierarchyTargets(filteredNodes, layoutEdges, width, height);
+      filteredNodes.forEach(node => {
+        node.x = (node._targetX ?? width / 2) + (Math.random() - 0.5) * 18;
+        node.y = (node._targetY ?? height / 2) + (Math.random() - 0.5) * 18;
+        node.vx = 0;
+        node.vy = 0;
+        node.fx = null;
+        node.fy = null;
       });
+
+      simulation = d3.forceSimulation(filteredNodes)
+        // 保留 link force 只为把 source/target 解析成节点对象，不给拉力
+        .force('link', d3.forceLink(filteredEdges).id(d => d.id).strength(0).distance(0))
+        .force('x', d3.forceX(d => d._targetX ?? width / 2).strength(0.9))
+        .force('y', d3.forceY(d => d._targetY ?? height / 2).strength(0.85))
+        .force('charge', d3.forceManyBody().strength(-40).distanceMax(240))
+        // 标签文字在节点下方，额外留出标签高度，避免相邻标签文字叠在一起
+        .force('collision', d3.forceCollide().radius(d => getNodeRadius(d) + (d.type === 'tag' ? 24 : d.type === 'post' ? 12 : 8)).strength(0.9))
+        .alphaDecay(0.04)
+        .on('tick', ticked)
+        .on('end', onSimulationEnd);
+    } else {
+      const forceConfig = CONFIG.forces[currentLayout];
+
+      simulation = d3.forceSimulation(filteredNodes)
+        .force('link', d3.forceLink(filteredEdges)
+          .id(d => d.id)
+          .distance(d => (forceConfig.linkDistance * layoutScale) / Math.sqrt(d.weight || 1))
+          .strength(0.7))
+        .force('charge', d3.forceManyBody()
+          .strength(forceConfig.charge * layoutScale * layoutScale)
+          .distanceMax(300 * layoutScale))
+        .force('center', d3.forceCenter(width / 2, height / 2)
+          .strength(forceConfig.centerForce))
+        .force('collision', d3.forceCollide()
+          .radius(d => getNodeRadius(d) + 4)
+          .strength(0.5))
+        .on('tick', ticked)
+        .on('end', onSimulationEnd);
+    }
 
     // 首次渲染 / 切换筛选或布局后，等模拟稳定再自动适应视野
     pendingFit = true;
@@ -474,7 +633,7 @@
     nodeAll.select('text')
       .text(d => d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label)
       .attr('dy', d => getNodeRadius(d) + 14)
-      .style('opacity', d => d.type === 'post' ? 0 : 1);
+      .style('opacity', d => d.type === 'post' ? (currentLayout === 'hierarchical' ? 0.9 : 0) : 1);
 
     function ticked() {
       redraw();
@@ -616,11 +775,15 @@
 
     const bounds = nodes.reduce((acc, n) => {
       const r = getNodeRadius(n);
+      const showLabel = !(n.type === 'post' && currentLayout !== 'hierarchical');
+      // 标签在节点下方，横向也会超出圆半径；适应视野时一并算进去
+      const labelHalf = showLabel ? Math.min(100, String(n.label || '').length * 5.5) : 0;
+      const labelBottom = showLabel ? 26 : 0;
       return {
-        minX: Math.min(acc.minX, (n.x || 0) - r),
-        maxX: Math.max(acc.maxX, (n.x || 0) + r),
+        minX: Math.min(acc.minX, (n.x || 0) - r - labelHalf),
+        maxX: Math.max(acc.maxX, (n.x || 0) + r + labelHalf),
         minY: Math.min(acc.minY, (n.y || 0) - r),
-        maxY: Math.max(acc.maxY, (n.y || 0) + r)
+        maxY: Math.max(acc.maxY, (n.y || 0) + r + labelBottom)
       };
     }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
 

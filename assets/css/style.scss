@@ -907,6 +907,11 @@ body.graph-page .site-footer {
   fill: var(--color-text-secondary);
   pointer-events: none;
   user-select: none;
+  /* 文字描边用背景色，压住穿过标签的连线，保证层级布局下也能读清 */
+  paint-order: stroke fill;
+  stroke: var(--color-bg-elevated);
+  stroke-width: 3px;
+  stroke-linejoin: round;
   transition: opacity var(--transition-fast);
 }
 
