@@ -20,10 +20,18 @@
       tag: { base: 12, scale: 6 },
       category: { base: 16, scale: 8 }
     },
+    // hierarchical 走独立的 forceX/forceY 分支，用不到这组力参数
     forces: {
       force: { linkDistance: 80, charge: -300, centerForce: 0.3 },
-      radial: { linkDistance: 100, charge: -200, centerForce: 0.1 },
-      hierarchical: { linkDistance: 120, charge: -150, centerForce: 0.05 }
+      radial: { linkDistance: 100, charge: -200, centerForce: 0.02 }
+    },
+    radial: {
+      // 三类节点的目标环半径系数（相对可用半径）：分类 → 文章 → 标签
+      radius: { category: 0.3, post: 0.64, tag: 1 },
+      strength: 0.9,
+      linkStrength: 0.2,
+      // 每类错开起始角度，避免不同环的节点挤在同一条射线上
+      phase: { category: 0, post: 0.21, tag: 0.43 }
     }
   };
 
@@ -236,6 +244,21 @@
         simulation.force('y', d3.forceY(n => n._targetY ?? next.height / 2).strength(0.85));
         simulation.alpha(0.6).restart();
         pendingFit = true;
+      } else if (currentLayout === 'radial') {
+        // 环半径依赖画布尺寸，且 forceRadial 会缓存半径，必须整体重建
+        const cx = next.width / 2;
+        const cy = next.height / 2;
+        simulation.nodes().forEach(n => {
+          if (typeof n.x === 'number') n.x += dx;
+          if (typeof n.y === 'number') n.y += dy;
+        });
+        simulation.force('radial', d3.forceRadial(
+          d => radialRadius(d.type, next.width, next.height), cx, cy
+        ).strength(CONFIG.radial.strength));
+        simulation.force('center', d3.forceCenter(cx, cy)
+          .strength(CONFIG.forces.radial.centerForce));
+        simulation.alpha(0.5).restart();
+        pendingFit = true;
       } else {
         // 布局坐标跟随新画布中心平移，避免尺寸变化后整块图谱偏向一侧
         if (dx || dy) {
@@ -250,9 +273,10 @@
       redraw();
     }
 
-    // 拖动窗口时只在停下来后重新适应一次视野
+    // 拖动窗口时只在停下来后重新适应一次视野；层级/放射状由模拟结束时的
+    // pendingFit 触发，避免和这里的定时器重复缩放
     clearTimeout(resizeTimer);
-    if (currentLayout !== 'hierarchical') {
+    if (currentLayout === 'force') {
       resizeTimer = setTimeout(fitToView, 160);
     }
   }
@@ -366,6 +390,43 @@
     });
 
     fitViewBtn?.addEventListener('click', fitToView);
+  }
+
+  // 放射状：按节点类型把节点约束到三个同心环上。
+  // 半径以扣除上下浮层后的可用高度为基准，这样 fitToView 的缩放接近 1，
+  // 节点圆和 11px 标签不会被一起缩得难读
+  function radialRadius(type, width, height) {
+    const inset = overlayInsets();
+    const usableH = Math.max(160, height - inset.top - inset.bottom);
+    const available = Math.min(width, usableH) * 0.42;
+    const factor = CONFIG.radial.radius[type] ?? CONFIG.radial.radius.post;
+    return available * factor;
+  }
+
+  // 预设均匀的初始角度：收敛更快，且每次切到放射状得到的图是可复现的
+  function assignRadialStarts(nodes, width, height) {
+    const cx = width / 2;
+    const cy = height / 2;
+    const groups = { category: [], post: [], tag: [] };
+    nodes.forEach(node => {
+      (groups[node.type] || groups.post).push(node);
+    });
+
+    Object.keys(groups).forEach(type => {
+      const list = groups[type];
+      if (!list.length) return;
+      const radius = radialRadius(type, width, height);
+      const phase = CONFIG.radial.phase[type] ?? 0;
+      list.forEach((node, i) => {
+        const angle = 2 * Math.PI * (i / list.length) + phase;
+        node.x = cx + radius * Math.cos(angle);
+        node.y = cy + radius * Math.sin(angle);
+        node.vx = 0;
+        node.vy = 0;
+        node.fx = null;
+        node.fy = null;
+      });
+    });
   }
 
   // 真正的层级布局：分类在左、文章在中、标签在右；文章按分类分组纵向排列
@@ -522,7 +583,8 @@
     const onSimulationEnd = () => {
       if (!pendingFit) return;
       pendingFit = false;
-      if (currentLayout !== 'hierarchical') spreadWide();
+      // 只有力导向需要横向拉开；放射状的同心环被拉开会变成椭圆
+      if (currentLayout === 'force') spreadWide();
       redraw();
       fitToView();
     };
@@ -552,12 +614,15 @@
         .on('end', onSimulationEnd);
     } else {
       const forceConfig = CONFIG.forces[currentLayout];
+      const isRadial = currentLayout === 'radial';
+      if (isRadial) assignRadialStarts(filteredNodes, width, height);
 
       simulation = d3.forceSimulation(filteredNodes)
         .force('link', d3.forceLink(filteredEdges)
           .id(d => d.id)
           .distance(d => (forceConfig.linkDistance * layoutScale) / Math.sqrt(d.weight || 1))
-          .strength(0.7))
+          // 放射状下让环约束主导，连线只做轻微牵引，否则会把节点拽离自己的环
+          .strength(isRadial ? CONFIG.radial.linkStrength : 0.7))
         .force('charge', d3.forceManyBody()
           .strength(forceConfig.charge * layoutScale * layoutScale)
           .distanceMax(300 * layoutScale))
@@ -568,6 +633,15 @@
           .strength(0.5))
         .on('tick', ticked)
         .on('end', onSimulationEnd);
+
+      if (isRadial) {
+        // forceRadial 在 initialize 时缓存每个节点的目标半径，
+        // 画布尺寸变化时必须整体重建（见 handleResize）
+        simulation.alphaDecay(0.05).force('radial', d3.forceRadial(
+          d => radialRadius(d.type, width, height),
+          width / 2, height / 2
+        ).strength(CONFIG.radial.strength));
+      }
     }
 
     // 首次渲染 / 切换筛选或布局后，等模拟稳定再自动适应视野

@@ -41,7 +41,7 @@ body_class: "graph-page"
 
       <div class="control-group">
         <label for="layout-type">布局</label>
-        <select id="layout-type" class="control-select" title="分类在左、文章居中、标签在右">
+        <select id="layout-type" class="control-select" title="力导向：自由聚类 · 放射状：按类型分同心环 · 层级分组：三列排布">
           <option value="force">力导向</option>
           <option value="radial">放射状</option>
           <option value="hierarchical">层级分组</option>
