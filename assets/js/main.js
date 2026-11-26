@@ -92,32 +92,7 @@
   }
 })();
 
-// A1: 鼠标跟随光晕（仅桌面、尊重减少动态偏好）
-(function() {
-  if (!document.documentElement.classList.contains('enable-fx')) return;
-
-  const root = document.documentElement;
-  let rafId = 0;
-  let pending = null;
-
-  function onPointerMove(e) {
-    pending = { x: e.clientX, y: e.clientY };
-    if (rafId) return;
-    rafId = requestAnimationFrame(() => {
-      rafId = 0;
-      if (!pending) return;
-      root.style.setProperty('--mouse-x', `${pending.x}px`);
-      root.style.setProperty('--mouse-y', `${pending.y}px`);
-      root.classList.add('pointer-active');
-    });
-  }
-
-  window.addEventListener('pointermove', onPointerMove, { passive: true });
-  document.addEventListener('pointerleave', () => root.classList.remove('pointer-active'));
-  window.addEventListener('blur', () => root.classList.remove('pointer-active'));
-})();
-
-// A2: Hero 交互式星点背景（仅桌面、尊重减少动态偏好）
+// A2: Hero 交互式粒子网络（仅桌面、尊重减少动态偏好）
 (function() {
   if (!document.documentElement.classList.contains('enable-fx')) return;
   const canvas = document.getElementById('hero-particles');
@@ -132,19 +107,17 @@
   let height = 0;
   let dpr = 1;
   let particles = [];
-  let pointer = { x: -9999, y: -9999, active: false };
+  const ripples = [];
+  const pointer = { x: -9999, y: -9999, active: false };
   let running = true;
+  let linkDist = 120;
 
-  const style = getComputedStyle(document.documentElement);
-  function themeColor() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'light';
-    return (style.getPropertyValue(theme === 'dark' ? '--color-secondary' : '--color-primary') || '#6366f1').trim();
-  }
-
+  const rootStyle = getComputedStyle(document.documentElement);
   function hexToRgb(hex) {
-    const clean = hex.replace('#', '').trim();
+    const clean = (hex || '').replace('#', '').trim();
     const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
     const num = parseInt(full, 16);
+    if (Number.isNaN(num)) return { r: 99, g: 102, b: 241 };
     return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
   }
 
@@ -157,22 +130,81 @@
     canvas.height = Math.round(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const count = Math.min(90, Math.max(35, Math.floor((width * height) / 18000)));
+    linkDist = Math.max(110, Math.min(180, width / 7));
+    const count = Math.min(95, Math.max(45, Math.floor((width * height) / 15000)));
     particles = Array.from({ length: count }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      r: Math.random() * 1.6 + 0.6,
-      vx: (Math.random() - 0.5) * 0.12,
-      vy: -(Math.random() * 0.18 + 0.04)
+      r: Math.random() * 1.8 + 0.7,
+      vx: (Math.random() - 0.5) * 0.16,
+      vy: -(Math.random() * 0.2 + 0.05),
+      baseVx: 0,
+      baseVy: 0
     }));
+    particles.forEach(p => { p.baseVx = p.vx; p.baseVy = p.vy; });
   }
 
   function draw() {
     if (!running) return;
     ctx.clearRect(0, 0, width, height);
-    const { r, g, b } = hexToRgb(style.getPropertyValue('--color-primary').trim() || '#6366f1');
+
+    // 每帧读取当前主题色，明暗主题切换后粒子颜色自动跟随
+    const { r, g, b } = hexToRgb(rootStyle.getPropertyValue('--color-primary'));
+    const rgba = (a) => `rgba(${r}, ${g}, ${b}, ${a})`;
+    const maxDist2 = linkDist * linkDist;
+
+    ctx.lineWidth = 1;
+    // 粒子之间连线：越近越清晰，形成网络感
+    for (let i = 0; i < particles.length; i++) {
+      const a = particles[i];
+      for (let j = i + 1; j < particles.length; j++) {
+        const p = particles[j];
+        const dx = a.x - p.x;
+        const dy = a.y - p.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < maxDist2) {
+          ctx.strokeStyle = rgba((1 - d2 / maxDist2) * 0.32);
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 指针与附近粒子连线：鼠标移动成为画面焦点
+    if (pointer.active) {
+      const near2 = maxDist2 * 1.3;
+      for (const p of particles) {
+        const dx = p.x - pointer.x;
+        const dy = p.y - pointer.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < near2) {
+          ctx.strokeStyle = rgba((1 - d2 / near2) * 0.55);
+          ctx.beginPath();
+          ctx.moveTo(pointer.x, pointer.y);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 点击涟漪
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const rp = ripples[i];
+      rp.r += 2.4;
+      const alpha = Math.max(0, 1 - rp.r / 130);
+      if (alpha <= 0) { ripples.splice(i, 1); continue; }
+      ctx.strokeStyle = rgba(alpha * 0.35);
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     for (const p of particles) {
+      // 被点击推开后缓慢回到原本的漂移速度
+      p.vx += (p.baseVx - p.vx) * 0.02;
+      p.vy += (p.baseVy - p.vy) * 0.02;
       p.x += p.vx;
       p.y += p.vy;
 
@@ -180,8 +212,8 @@
         const dx = pointer.x - p.x;
         const dy = pointer.y - p.y;
         const dist = Math.hypot(dx, dy);
-        if (dist > 0 && dist < 110) {
-          const f = (1 - dist / 110) * 0.6;
+        if (dist > 0 && dist < 100) {
+          const f = (1 - dist / 100) * 0.5;
           p.x -= (dx / dist) * f;
           p.y -= (dy / dist) * f;
         }
@@ -193,7 +225,7 @@
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
+      ctx.fillStyle = rgba(0.55);
       ctx.fill();
     }
     requestAnimationFrame(draw);
@@ -204,8 +236,8 @@
     pointer.x = e.clientX - rect.left;
     pointer.y = e.clientY - rect.top;
     pointer.active = pointer.x >= 0 && pointer.x <= width && pointer.y >= 0 && pointer.y <= height;
-    hero.style.setProperty('--hero-parallax-x', `${(e.clientX - rect.left - width / 2) * 0.012}px`);
-    hero.style.setProperty('--hero-parallax-y', `${(e.clientY - rect.top - height / 2) * 0.012}px`);
+    hero.style.setProperty('--hero-parallax-x', `${(pointer.x - width / 2) * 0.012}px`);
+    hero.style.setProperty('--hero-parallax-y', `${(pointer.y - height / 2) * 0.012}px`);
   }
 
   function onLeave() {
@@ -214,10 +246,28 @@
     hero.style.setProperty('--hero-parallax-y', '0px');
   }
 
+  function onDown(e) {
+    const rect = hero.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    ripples.push({ x, y, r: 0 });
+    for (const p of particles) {
+      const dx = p.x - x;
+      const dy = p.y - y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0 && dist < 160) {
+        const push = (1 - dist / 160) * 0.9;
+        p.vx += (dx / dist) * push;
+        p.vy += (dy / dist) * push;
+      }
+    }
+  }
+
   resize();
   draw();
   hero.addEventListener('pointermove', onMove, { passive: true });
   hero.addEventListener('pointerleave', onLeave);
+  hero.addEventListener('pointerdown', onDown, { passive: true });
 
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
@@ -247,8 +297,6 @@
       const py = (e.clientY - rect.top) / rect.height;
       card.style.setProperty('--tilt-x', `${(0.5 - py) * 6}deg`);
       card.style.setProperty('--tilt-y', `${(px - 0.5) * 6}deg`);
-      card.style.setProperty('--glow-x', `${px * 100}%`);
-      card.style.setProperty('--glow-y', `${py * 100}%`);
     };
     const onLeave = () => {
       card.style.setProperty('--tilt-x', '0deg');
