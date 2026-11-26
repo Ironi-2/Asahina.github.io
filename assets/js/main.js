@@ -83,28 +83,254 @@
   });
 })();
 
-// Smooth scroll for anchor links
+// 视觉能力检测：仅桌面精确指针启用跟随/视差/倾斜等装饰动画
 (function() {
+  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (finePointer && !reduceMotion) {
+    document.documentElement.classList.add('enable-fx');
+  }
+})();
+
+// A1: 鼠标跟随光晕（仅桌面、尊重减少动态偏好）
+(function() {
+  if (!document.documentElement.classList.contains('enable-fx')) return;
+
+  const root = document.documentElement;
+  let rafId = 0;
+  let pending = null;
+
+  function onPointerMove(e) {
+    pending = { x: e.clientX, y: e.clientY };
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      if (!pending) return;
+      root.style.setProperty('--mouse-x', `${pending.x}px`);
+      root.style.setProperty('--mouse-y', `${pending.y}px`);
+      root.classList.add('pointer-active');
+    });
+  }
+
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.addEventListener('pointerleave', () => root.classList.remove('pointer-active'));
+  window.addEventListener('blur', () => root.classList.remove('pointer-active'));
+})();
+
+// A2: Hero 交互式星点背景（仅桌面、尊重减少动态偏好）
+(function() {
+  if (!document.documentElement.classList.contains('enable-fx')) return;
+  const canvas = document.getElementById('hero-particles');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const hero = canvas.closest('.hero');
+  if (!hero) return;
+
+  let width = 0;
+  let height = 0;
+  let dpr = 1;
+  let particles = [];
+  let pointer = { x: -9999, y: -9999, active: false };
+  let running = true;
+
+  const style = getComputedStyle(document.documentElement);
+  function themeColor() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    return (style.getPropertyValue(theme === 'dark' ? '--color-secondary' : '--color-primary') || '#6366f1').trim();
+  }
+
+  function hexToRgb(hex) {
+    const clean = hex.replace('#', '').trim();
+    const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+    const num = parseInt(full, 16);
+    return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+  }
+
+  function resize() {
+    const rect = hero.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = rect.width;
+    height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const count = Math.min(90, Math.max(35, Math.floor((width * height) / 18000)));
+    particles = Array.from({ length: count }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: Math.random() * 1.6 + 0.6,
+      vx: (Math.random() - 0.5) * 0.12,
+      vy: -(Math.random() * 0.18 + 0.04)
+    }));
+  }
+
+  function draw() {
+    if (!running) return;
+    ctx.clearRect(0, 0, width, height);
+    const { r, g, b } = hexToRgb(style.getPropertyValue('--color-primary').trim() || '#6366f1');
+
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+
+      if (pointer.active) {
+        const dx = pointer.x - p.x;
+        const dy = pointer.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0 && dist < 110) {
+          const f = (1 - dist / 110) * 0.6;
+          p.x -= (dx / dist) * f;
+          p.y -= (dy / dist) * f;
+        }
+      }
+
+      if (p.y < -5) { p.y = height + 5; p.x = Math.random() * width; }
+      if (p.x < -5) p.x = width + 5;
+      if (p.x > width + 5) p.x = -5;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+
+  function onMove(e) {
+    const rect = hero.getBoundingClientRect();
+    pointer.x = e.clientX - rect.left;
+    pointer.y = e.clientY - rect.top;
+    pointer.active = pointer.x >= 0 && pointer.x <= width && pointer.y >= 0 && pointer.y <= height;
+    hero.style.setProperty('--hero-parallax-x', `${(e.clientX - rect.left - width / 2) * 0.012}px`);
+    hero.style.setProperty('--hero-parallax-y', `${(e.clientY - rect.top - height / 2) * 0.012}px`);
+  }
+
+  function onLeave() {
+    pointer.active = false;
+    hero.style.setProperty('--hero-parallax-x', '0px');
+    hero.style.setProperty('--hero-parallax-y', '0px');
+  }
+
+  resize();
+  draw();
+  hero.addEventListener('pointermove', onMove, { passive: true });
+  hero.addEventListener('pointerleave', onLeave);
+
+  let resizeRaf = 0;
+  window.addEventListener('resize', () => {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resize(); });
+  }, { passive: true });
+
+  // 首屏滚出视口后暂停动画，避免长页面无谓耗电
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(entries => {
+      running = entries[0].isIntersecting;
+      if (running) requestAnimationFrame(draw);
+    }, { threshold: 0 }).observe(hero);
+  }
+})();
+
+// A3: 文章卡片 3D 倾斜 + 边缘高光（仅桌面、尊重减少动态偏好）
+(function() {
+  if (!document.documentElement.classList.contains('enable-fx')) return;
+  const cards = document.querySelectorAll('.post-card');
+  if (!cards.length) return;
+
+  cards.forEach(card => {
+    const onMove = (e) => {
+      const rect = card.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width;
+      const py = (e.clientY - rect.top) / rect.height;
+      card.style.setProperty('--tilt-x', `${(0.5 - py) * 6}deg`);
+      card.style.setProperty('--tilt-y', `${(px - 0.5) * 6}deg`);
+      card.style.setProperty('--glow-x', `${px * 100}%`);
+      card.style.setProperty('--glow-y', `${py * 100}%`);
+    };
+    const onLeave = () => {
+      card.style.setProperty('--tilt-x', '0deg');
+      card.style.setProperty('--tilt-y', '0deg');
+    };
+    card.addEventListener('pointermove', onMove, { passive: true });
+    card.addEventListener('pointerleave', onLeave);
+  });
+})();
+
+// B1: 阅读进度条（渐变 + 模糊，平滑化）
+(function() {
+  const progressBar = document.getElementById('reading-progress') || (function() {
+    const bar = document.createElement('div');
+    bar.id = 'reading-progress';
+    bar.className = 'reading-progress';
+    document.body.appendChild(bar);
+    return bar;
+  })();
+
+  let target = 0;
+  let current = 0;
+  let rafId = 0;
+
+  function update() {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    target = docHeight > 0 ? Math.min(1, Math.max(0, scrollTop / docHeight)) : 0;
+  }
+
+  function animate() {
+    const diff = target - current;
+    if (Math.abs(diff) > 0.0005) {
+      current += diff * 0.2;
+      progressBar.style.transform = `scaleX(${current})`;
+      rafId = requestAnimationFrame(animate);
+    } else {
+      current = target;
+      progressBar.style.transform = `scaleX(${current})`;
+      rafId = 0;
+    }
+  }
+
+  function onScroll() {
+    update();
+    if (!rafId) rafId = requestAnimationFrame(animate);
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+  onScroll();
+})();
+
+// B2: 锚点定位高亮（平滑滚动 + 目标区块短暂发光）
+(function() {
+  const header = document.querySelector('.site-header');
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function(e) {
       const targetId = this.getAttribute('href');
-      if (targetId === '#') return;
+      if (!targetId || targetId === '#') return;
       const target = document.querySelector(targetId);
-      if (target) {
-        e.preventDefault();
-        const headerHeight = document.querySelector('.site-header')?.offsetHeight || 0;
-        const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - headerHeight;
-        window.scrollTo({
-          top: targetPosition,
-          behavior: 'smooth'
-        });
-        target.focus({ preventScroll: true });
-      }
+      if (!target) return;
+
+      e.preventDefault();
+      const headerHeight = header?.offsetHeight || 0;
+      const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - headerHeight;
+      window.scrollTo({
+        top: targetPosition,
+        behavior: 'smooth'
+      });
+      target.focus({ preventScroll: true });
+
+      target.classList.remove('anchor-flash');
+      // 强制重排，保证连续点击同一锚点时动画可重新播放
+      void target.offsetWidth;
+      target.classList.add('anchor-flash');
+      window.setTimeout(() => target.classList.remove('anchor-flash'), 1400);
     });
   });
 })();
 
-// Scroll reveal animation
+// 滚动渐入动画（保留原有行为，但不再用内联样式覆盖 CSS）
 (function() {
   const observerOptions = {
     root: null,
@@ -123,50 +349,10 @@
     });
   }, observerOptions);
 
-  // Observe elements with animation classes
   document.querySelectorAll('.post-card, .highlight, .stat, .post-content h2, .post-content h3').forEach(el => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(20px)';
-    el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    el.classList.add('reveal');
     observer.observe(el);
   });
-
-  // Add visible class styles
-  const style = document.createElement('style');
-  style.textContent = `
-    .post-card.visible, .highlight.visible, .stat.visible, .post-content h2.visible, .post-content h3.visible {
-      opacity: 1 !important;
-      transform: translateY(0) !important;
-    }
-  `;
-  document.head.appendChild(style);
-})();
-
-// Reading progress indicator
-(function() {
-  const progressBar = document.createElement('div');
-  progressBar.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
-    z-index: 9999;
-    transform-origin: left;
-    transform: scaleX(0);
-    pointer-events: none;
-  `;
-  document.body.appendChild(progressBar);
-
-  function updateProgress() {
-    const scrollTop = window.scrollY;
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    const progress = docHeight > 0 ? scrollTop / docHeight : 0;
-    progressBar.style.transform = `scaleX(${progress})`;
-  }
-
-  window.addEventListener('scroll', updateProgress, { passive: true });
-  updateProgress();
 })();
 
 // Copy code blocks

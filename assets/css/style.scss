@@ -1213,3 +1213,132 @@ body.graph-page .site-footer {
   }
 }
 
+/* ============================================================
+   视觉美化增强 A1/A2/A3/B1/B2
+   原则：复用现有 token；仅桌面精确指针启用跟随/倾斜/视差；
+   移动端降级为静态；尊重 prefers-reduced-motion。
+   ============================================================ */
+
+/* A1: 鼠标跟随光晕（固定在视口中，跟随 --mouse-x / --mouse-y） */
+body::after {
+  content: "";
+  position: fixed;
+  left: var(--mouse-x, 50vw);
+  top: var(--mouse-y, 50vh);
+  width: 460px;
+  height: 460px;
+  margin: -230px 0 0 -230px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--color-primary) 12%, transparent) 0%,
+    color-mix(in srgb, var(--color-secondary) 7%, transparent) 35%,
+    transparent 70%);
+  pointer-events: none;
+  z-index: var(--z-fixed);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+html.pointer-active body::after { opacity: 1; }
+
+/* A2: Hero 星点画布 + 内容轻微视差 */
+#hero-particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.hero-content {
+  transform: translate3d(var(--hero-parallax-x, 0), var(--hero-parallax-y, 0), 0);
+  transition: transform 300ms ease-out;
+}
+/* 无动画能力时画布直接隐藏，不留空白层 */
+html:not(.enable-fx) #hero-particles { display: none; }
+
+/* A3: 文章卡片 3D 倾斜 + 边缘高光 */
+.enable-fx .post-card {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 120ms ease-out, box-shadow var(--transition-normal), border-color var(--transition-normal);
+  position: relative;
+}
+.enable-fx .post-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(320px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  pointer-events: none;
+}
+.enable-fx .post-card:hover::after { opacity: 1; }
+/* 悬停时仍保留原来的上浮与阴影，倾斜不再被 translateY 覆盖 */
+.enable-fx .post-card:hover {
+  box-shadow: var(--shadow-xl);
+  border-color: var(--color-primary);
+}
+
+/* B1: 阅读进度条 */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  z-index: var(--z-tooltip);
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+
+/* B2: 锚点定位高亮 */
+.anchor-flash {
+  animation: anchor-flash 1.4s ease-out;
+}
+@keyframes anchor-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 40%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 16px transparent;
+    background-color: transparent;
+  }
+}
+
+/* 滚动渐入：CSS 管理初始态与显示态，JS 只加 class，避免内联样式覆盖卡片 3D */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* 卡片有 3D 悬停时，渐入结束后交还给倾斜 transform */
+.enable-fx .post-card.reveal.visible { transform: none; }
+
+/* 移动端 / 触摸设备：关闭跟随光晕、视差、倾斜，保留静态观感与可访问性 */
+@media (hover: none), (pointer: coarse) {
+  body::after { display: none !important; }
+  #hero-particles { display: none !important; }
+  .hero-content { transform: none !important; }
+  .post-card { transform: none !important; }
+  .post-card::after { display: none !important; }
+}
+
+/* 减少动态偏好：所有新增装饰动画收敛 */
+@media (prefers-reduced-motion: reduce) {
+  body::after, #hero-particles { display: none !important; }
+  .hero-content { transform: none !important; transition: none !important; }
+  .post-card, .post-card::after { transform: none !important; }
+  .reading-progress { transition: none; }
+  .anchor-flash { animation: none; }
+  .reveal, .reveal.visible { opacity: 1; transform: none; transition: none; }
+}
+
