@@ -92,16 +92,13 @@
   }
 })();
 
-// A2: Hero 交互式粒子网络（仅桌面、尊重减少动态偏好）
+// A2: 全站交互式粒子网络（固定视口底层，不遮挡正文；仅桌面、尊重减少动态偏好）
 (function() {
   if (!document.documentElement.classList.contains('enable-fx')) return;
-  const canvas = document.getElementById('hero-particles');
+  const canvas = document.getElementById('site-particles');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-
-  const hero = canvas.closest('.hero');
-  if (!hero) return;
 
   let width = 0;
   let height = 0;
@@ -110,7 +107,11 @@
   const ripples = [];
   const pointer = { x: -9999, y: -9999, active: false };
   let running = true;
+  let rafId = 0;
   let linkDist = 120;
+  // 文章/页面正文页进一步降低粒子存在感，避免干扰阅读
+  const textPage = !!document.querySelector('.post-content, .page-content');
+  const density = textPage ? 0.55 : 1;
 
   const rootStyle = getComputedStyle(document.documentElement);
   function hexToRgb(hex) {
@@ -122,17 +123,16 @@
   }
 
   function resize() {
-    const rect = hero.getBoundingClientRect();
+    width = window.innerWidth;
+    height = window.innerHeight;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    width = rect.width;
-    height = rect.height;
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    linkDist = Math.max(110, Math.min(180, width / 7));
-    const count = Math.min(95, Math.max(45, Math.floor((width * height) / 15000)));
-    particles = Array.from({ length: count }, () => ({
+    linkDist = Math.max(100, Math.min(160, width / 9));
+    const count = Math.min(80, Math.max(30, Math.floor((width * height) / 20000))) * density;
+    particles = Array.from({ length: Math.round(count) }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
       r: Math.random() * 1.8 + 0.7,
@@ -145,12 +145,12 @@
   }
 
   function draw() {
-    if (!running) return;
+    if (!running) { rafId = 0; return; }
     ctx.clearRect(0, 0, width, height);
 
     // 每帧读取当前主题色，明暗主题切换后粒子颜色自动跟随
     const { r, g, b } = hexToRgb(rootStyle.getPropertyValue('--color-primary'));
-    const rgba = (a) => `rgba(${r}, ${g}, ${b}, ${a})`;
+    const rgba = (a) => `rgba(${r}, ${g}, ${b}, ${a * density})`;
     const maxDist2 = linkDist * linkDist;
 
     ctx.lineWidth = 1;
@@ -228,28 +228,27 @@
       ctx.fillStyle = rgba(0.55);
       ctx.fill();
     }
-    requestAnimationFrame(draw);
+    rafId = requestAnimationFrame(draw);
   }
 
+  function start() {
+    if (running && !rafId) rafId = requestAnimationFrame(draw);
+  }
+  function stop() {
+    running = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+  }
+
+  // 画布 fixed 定位，指针坐标即视口坐标，无需减去元素偏移
   function onMove(e) {
-    const rect = hero.getBoundingClientRect();
-    pointer.x = e.clientX - rect.left;
-    pointer.y = e.clientY - rect.top;
-    pointer.active = pointer.x >= 0 && pointer.x <= width && pointer.y >= 0 && pointer.y <= height;
-    hero.style.setProperty('--hero-parallax-x', `${(pointer.x - width / 2) * 0.012}px`);
-    hero.style.setProperty('--hero-parallax-y', `${(pointer.y - height / 2) * 0.012}px`);
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+    pointer.active = true;
   }
-
-  function onLeave() {
-    pointer.active = false;
-    hero.style.setProperty('--hero-parallax-x', '0px');
-    hero.style.setProperty('--hero-parallax-y', '0px');
-  }
-
+  function onLeave() { pointer.active = false; }
   function onDown(e) {
-    const rect = hero.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = e.clientX;
+    const y = e.clientY;
     ripples.push({ x, y, r: 0 });
     for (const p of particles) {
       const dx = p.x - x;
@@ -264,10 +263,12 @@
   }
 
   resize();
-  draw();
-  hero.addEventListener('pointermove', onMove, { passive: true });
-  hero.addEventListener('pointerleave', onLeave);
-  hero.addEventListener('pointerdown', onDown, { passive: true });
+  running = true;
+  start();
+  window.addEventListener('pointermove', onMove, { passive: true });
+  document.addEventListener('pointerleave', onLeave);
+  window.addEventListener('blur', onLeave);
+  window.addEventListener('pointerdown', onDown, { passive: true });
 
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
@@ -275,13 +276,11 @@
     resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resize(); });
   }, { passive: true });
 
-  // 首屏滚出视口后暂停动画，避免长页面无谓耗电
-  if ('IntersectionObserver' in window) {
-    new IntersectionObserver(entries => {
-      running = entries[0].isIntersecting;
-      if (running) requestAnimationFrame(draw);
-    }, { threshold: 0 }).observe(hero);
-  }
+  // 标签页切到后台时暂停，避免无谓耗电
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stop();
+    else { running = true; start(); }
+  });
 })();
 
 // A3: 文章卡片 3D 倾斜 + 边缘高光（仅桌面、尊重减少动态偏好）
